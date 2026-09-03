@@ -99,6 +99,26 @@ export default function DashboardPage() {
           )}
         </SectionCard>
 
+        <SectionCard title="High value at risk" count={sections.high_value_at_risk.length} tone="warning">
+          {sections.high_value_at_risk.length === 0 ? (
+            <EmptyState message="No large deals are drifting." />
+          ) : (
+            sections.high_value_at_risk.map((opportunity) => (
+              <OpportunityRow key={opportunity.id} opportunity={opportunity} />
+            ))
+          )}
+        </SectionCard>
+
+        <SectionCard title="Biggest open deals" count={sections.top_value_open.length}>
+          {sections.top_value_open.length === 0 ? (
+            <EmptyState message="No open opportunities with a value yet." />
+          ) : (
+            sections.top_value_open.map((opportunity) => (
+              <OpportunityRow key={opportunity.id} opportunity={opportunity} />
+            ))
+          )}
+        </SectionCard>
+
         <SectionCard
           title={`Quiet for ${meta.inactivity_threshold_days}+ days`}
           count={sections.recently_inactive.length}

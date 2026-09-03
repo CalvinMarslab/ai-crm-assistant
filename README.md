@@ -65,7 +65,12 @@ mysql -u root -e "CREATE DATABASE ai_crm_testing CHARACTER SET utf8mb4 COLLATE u
 cd backend && php artisan test
 ```
 
-58 feature tests, written directly against `ACCEPTANCE_TEST.md`.
+98 feature tests: the `ACCEPTANCE_TEST.md` criteria, the end-to-end lead
+lifecycle, tenant and role isolation, opportunity state rules, timezone handling,
+and production-safety checks.
+
+The suite freezes the clock (`Tests\TestCase::NOW`) because much of this domain
+is time-relative; without that, results depend on what time of day the suite runs.
 
 ## Architecture
 
@@ -219,6 +224,37 @@ Isolation is enforced in policies and in the query scope, and covered by tests.
   opportunity counts as inactive. Overridable per organization via
   `organizations.settings`, so it is not hard-coded in UI logic.
 - `currency` (default MYR).
+
+## Before real customer data
+
+Phase 1 has been through an audit and stabilization pass, but a few things are
+deployment decisions rather than code:
+
+**Keep the repository private.** It is private today. Treat that as a
+requirement, not a preference, once real customer names, deal values, or
+production credentials exist — including anything that reaches the repo through
+a seeder, a fixture, a screenshot, or a support dump. Making it public is a
+one-way door: anything ever pushed stays in the git history and in forks even
+after a later commit removes it.
+
+**Production checklist**
+
+| Item | What to do |
+|---|---|
+| `APP_DEBUG` | Set to `false`. The example file ships `true` for local work; leaving it on returns stack traces to users. |
+| `APP_ENV` | Set to `production`. `DemoDataSeeder` refuses to run outside `local`/`testing`, and this is what enforces it. |
+| `APP_KEY` | Generate a fresh one per environment (`php artisan key:generate`). Never share it across environments. |
+| `FRONTEND_URL` | Set to the real frontend origin. CORS is derived from it; a wrong value silently blocks the app. |
+| Seeded owner | `owner@aicrm.test` / `password` is a development convenience. Change the password, or delete the account, before anyone else can reach the system. |
+| `.env` | Never commit it. It is git-ignored; verify with `git check-ignore backend/.env`. |
+| Database | Use a dedicated user with rights to the CRM schema only, not `root`. |
+| HTTPS | Terminate TLS in front of the API. Tokens travel in the `Authorization` header. |
+| Backups | `opportunities`, `activities`, `audit_logs` and `opportunity_stage_history` are the irreplaceable tables. |
+
+**What is already enforced in code:** organization scoping on every query and at
+the authorization layer; login rate limiting (5/min per IP and per email) plus a
+general API limit (120/min); CORS restricted to `FRONTEND_URL`; passwords and
+tokens excluded from the audit trail; internal ids never exposed through the API.
 
 ## What Phase 1 does not include
 

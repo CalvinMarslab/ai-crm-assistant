@@ -8,6 +8,7 @@ use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Concerns\HasUuid;
 use App\Models\User;
 use App\Support\Auditable;
+use App\Support\OrganizationClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -85,12 +86,16 @@ class Task extends Model
 
     public function scopeDueToday(Builder $query): Builder
     {
-        return $query->open()->whereBetween('due_at', [now()->startOfDay(), now()->endOfDay()]);
+        $clock = app(OrganizationClock::class);
+
+        return $query->open()->whereBetween('due_at', [$clock->startOfToday(), $clock->endOfToday()]);
     }
 
     public function scopeUpcoming(Builder $query, int $days = 7): Builder
     {
-        return $query->open()->whereBetween('due_at', [now()->endOfDay(), now()->addDays($days)->endOfDay()]);
+        $clock = app(OrganizationClock::class);
+
+        return $query->open()->whereBetween('due_at', [$clock->endOfToday(), $clock->endOfDayIn($days)]);
     }
 
     public function scopeUnassigned(Builder $query): Builder

@@ -46,6 +46,22 @@ abstract class TestCase extends BaseTestCase
         parent::tearDown();
     }
 
+    /**
+     * SetOrganizationContext deliberately clears the tenant context when a
+     * request terminates, which is correct for long-lived workers but leaves
+     * the test body without one. Restore it so models built after a request
+     * still belong to the acting organization.
+     */
+    public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
+    {
+        $response = parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+
+        OrganizationContext::set($this->organization->id);
+        app(\App\Support\OrganizationClock::class)->reset();
+
+        return $response;
+    }
+
     protected function userWithRole(RoleCode $role, array $attributes = []): User
     {
         $user = User::factory()->create(array_merge([

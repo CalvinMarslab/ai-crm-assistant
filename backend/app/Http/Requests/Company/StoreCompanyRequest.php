@@ -6,6 +6,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreCompanyRequest extends FormRequest
 {
+    /** Authorization runs before validation, so a denied caller gets 403, not 422. */
+    public function authorize(): bool
+    {
+        return $this->user()?->can('create', Company::class) ?? false;
+    }
+
     /**
      * @return array<string, mixed>
      */

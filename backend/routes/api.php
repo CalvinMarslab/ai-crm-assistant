@@ -13,8 +13,10 @@ use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group(function () {
-    Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    // Deliberately tighter than the rest of the API: this is the one unauthenticated
+    // write endpoint, so it is the one worth brute-forcing.
+    Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);

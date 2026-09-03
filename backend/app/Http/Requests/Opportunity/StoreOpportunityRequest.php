@@ -11,11 +11,18 @@ use App\Domain\Opportunity\Models\LeadSource;
 use App\Domain\Pipeline\Models\Pipeline;
 use App\Domain\Pipeline\Models\PipelineStage;
 use App\Models\User;
+use App\Support\OrganizationContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreOpportunityRequest extends FormRequest
 {
+    /** Authorization runs before validation, so a denied caller gets 403, not 422. */
+    public function authorize(): bool
+    {
+        return $this->user()?->can('create', Opportunity::class) ?? false;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -27,7 +34,8 @@ class StoreOpportunityRequest extends FormRequest
             'primary_contact_id' => ['nullable', 'uuid', Rule::exists(Contact::class, 'uuid')],
             'pipeline_id' => ['nullable', 'integer', Rule::exists(Pipeline::class, 'id')],
             'stage_id' => ['nullable', 'integer', Rule::exists(PipelineStage::class, 'id')],
-            'owner_id' => ['nullable', 'uuid', Rule::exists(User::class, 'uuid')],
+            'owner_id' => ['nullable', 'uuid', Rule::exists(User::class, 'uuid')
+                ->where('organization_id', OrganizationContext::id())],
             'referral_agent_id' => ['nullable', 'uuid', Rule::exists(Agent::class, 'uuid')],
             'lead_source_code' => ['nullable', 'string', Rule::exists(LeadSource::class, 'code')],
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Identity\Enums\PermissionCode;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,7 +20,13 @@ class ActivityResource extends JsonResource
             'title' => $this->title,
             'body' => $this->body,
             'is_internal' => $this->is_internal,
-            'metadata' => $this->metadata,
+            // Metadata carries raw before/after values for changed fields, which
+            // can include commercial figures. Only users cleared for financials
+            // receive it; everyone else still gets the human-readable title.
+            'metadata' => $this->when(
+                $request->user()?->canDo(PermissionCode::OpportunityViewFinancials) ?? false,
+                $this->metadata,
+            ),
             'actor' => new UserSummaryResource($this->whenLoaded('actor')),
             'subject' => [
                 'type' => $this->subject_type,

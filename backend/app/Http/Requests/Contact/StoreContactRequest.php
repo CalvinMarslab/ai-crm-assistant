@@ -8,6 +8,12 @@ use Illuminate\Validation\Rule;
 
 class StoreContactRequest extends FormRequest
 {
+    /** Authorization runs before validation, so a denied caller gets 403, not 422. */
+    public function authorize(): bool
+    {
+        return $this->user()?->can('create', Contact::class) ?? false;
+    }
+
     /**
      * @return array<string, mixed>
      */

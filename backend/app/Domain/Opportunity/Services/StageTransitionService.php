@@ -61,11 +61,12 @@ class StageTransitionService
                 subject: $opportunity,
                 title: "Stage changed from {$fromStage->name} to {$toStage->name}",
                 body: $data->note,
+                // final_value is deliberately absent: activity metadata is returned
+                // verbatim on the timeline, which referral agents can read.
                 metadata: [
                     'from_stage' => $fromStage->code,
                     'to_stage' => $toStage->code,
                     'loss_reason' => $data->lossReason,
-                    'final_value' => $data->finalValue,
                 ],
             );
 
@@ -124,8 +125,11 @@ class StageTransitionService
             $attributes['lost_at'] = null;
             $attributes['final_value'] = $data->finalValue;
             $attributes['probability'] = 100;
-            // A won deal's open work is finished; the next action belongs to the project.
+            // A won deal's open work is finished; the next action belongs to the
+            // project. Leaving a follow-up date behind would keep the closed deal
+            // showing up in "follow-ups due" forever.
             $attributes['next_action'] = null;
+            $attributes['next_follow_up_at'] = null;
             $attributes['no_action_reason'] = 'Closed won — pending project handover';
         }
 

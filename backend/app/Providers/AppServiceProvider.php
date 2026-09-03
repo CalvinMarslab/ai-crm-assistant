@@ -9,6 +9,7 @@ use App\Domain\Company\Models\Contact;
 use App\Domain\Opportunity\Models\Opportunity;
 use App\Domain\Task\Models\Task;
 use App\Models\User;
+use App\Support\OrganizationClock;
 use App\Policies\AgentPolicy;
 use App\Policies\AuditLogPolicy;
 use App\Policies\CompanyPolicy;
@@ -17,15 +18,21 @@ use App\Policies\OpportunityPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // One instance per request so the organization's timezone is looked up
+        // once; SetOrganizationContext resets it as the acting tenant changes.
+        $this->app->singleton(OrganizationClock::class);
     }
 
     public function boot(): void
@@ -33,6 +40,48 @@ class AppServiceProvider extends ServiceProvider
         $this->registerMorphMap();
         $this->registerPolicies();
         $this->registerFactoryResolver();
+        $this->registerTenantGuard();
+        $this->registerRateLimiters();
+    }
+
+    private function registerRateLimiters(): void
+    {
+        // Authenticated traffic is generous; the login endpoint is not, and is
+        // keyed on both address and submitted email so one attacker cannot lock
+        // out a legitimate user by guessing against their account.
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
+            ->by($request->user()?->id ?: $request->ip()));
+
+        RateLimiter::for('login', fn (Request $request) => [
+            Limit::perMinute(5)->by($request->ip()),
+            Limit::perMinute(5)->by(strtolower((string) $request->input('email')).'|'.$request->ip()),
+        ]);
+    }
+
+    /**
+     * Defence in depth for multi-tenancy. The global query scope is the primary
+     * mechanism, but it depends on the request context having been set. This
+     * check runs on every authorization call and refuses outright whenever the
+     * subject belongs to a different organization than the acting user, so a
+     * record reached by any means still cannot be acted upon.
+     */
+    private function registerTenantGuard(): void
+    {
+        Gate::before(function (User $user, string $ability, array $arguments = []) {
+            foreach ($arguments as $argument) {
+                if (! $argument instanceof Model) {
+                    continue;
+                }
+
+                $organizationId = $argument->getAttribute('organization_id');
+
+                if ($organizationId !== null && (int) $organizationId !== (int) $user->organization_id) {
+                    return false;
+                }
+            }
+
+            return null;
+        });
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Domain\Opportunity\Services;
 use App\Domain\Opportunity\Enums\QuotationStatus;
 use App\Domain\Opportunity\Models\Opportunity;
 use App\Domain\Organization\Models\Organization;
+use App\Support\OrganizationClock;
 use App\Support\OrganizationContext;
 use Illuminate\Support\Collection;
 
@@ -90,7 +91,7 @@ class OpportunityHygieneService
     public function inactive(?int $days = null, int $limit = 10): Collection
     {
         return Opportunity::query()
-            ->inactiveSince(now()->subDays($days ?? $this->inactivityThresholdDays()))
+            ->inactiveSince(app(OrganizationClock::class)->daysAgo($days ?? $this->inactivityThresholdDays()))
             ->with(['company:id,uuid,name', 'stage:id,name,code', 'owner:id,uuid,name'])
             ->orderBy('last_contact_at')
             ->limit($limit)

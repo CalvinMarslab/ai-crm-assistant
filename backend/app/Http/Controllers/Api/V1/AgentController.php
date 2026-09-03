@@ -50,7 +50,7 @@ class AgentController extends Controller
     {
         $this->authorize('view', $agent);
 
-        return new AgentResource($agent->loadCount('opportunities'), $this->stats->for($agent));
+        return (new AgentResource($agent->loadCount('opportunities')))->withStats($this->stats->for($agent));
     }
 
     public function update(UpdateAgentRequest $request, Agent $agent): AgentResource

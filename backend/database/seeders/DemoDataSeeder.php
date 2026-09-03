@@ -30,6 +30,14 @@ class DemoDataSeeder extends Seeder
 {
     public function run(): void
     {
+        // Guarded here as well as at the call site: this seeder writes fictional
+        // customers, and running it against real data would be unrecoverable.
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn('DemoDataSeeder skipped: it only runs in local and testing environments.');
+
+            return;
+        }
+
         $organization = Organization::first();
         OrganizationContext::set($organization->id);
 

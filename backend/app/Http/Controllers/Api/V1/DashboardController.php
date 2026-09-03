@@ -32,6 +32,7 @@ class DashboardController extends Controller
                     'without_next_action' => OpportunityResource::collection($data['sections']['without_next_action']),
                     'proposals_awaiting_response' => OpportunityResource::collection($data['sections']['proposals_awaiting_response']),
                     'high_value_at_risk' => OpportunityResource::collection($data['sections']['high_value_at_risk']),
+                    'top_value_open' => OpportunityResource::collection($data['sections']['top_value_open']),
                     'recently_inactive' => OpportunityResource::collection($data['sections']['recently_inactive']),
                 ],
                 'metrics' => $data['metrics'],

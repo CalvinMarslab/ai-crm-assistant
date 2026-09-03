@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { opportunityApi, taskApi } from '@/api/endpoints'
+import { agentApi, opportunityApi, taskApi, userApi } from '@/api/endpoints'
 import { errorMessage, validationErrors } from '@/api/client'
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Spinner, Textarea, cx } from '@/components/ui'
 import { Modal, ModalFooter } from '@/components/Modal'
@@ -26,6 +26,7 @@ export default function OpportunityDetailPage() {
   const [editingNextAction, setEditingNextAction] = useState(false)
   const [addingNote, setAddingNote] = useState(false)
   const [addingTask, setAddingTask] = useState(false)
+  const [reassigning, setReassigning] = useState<'owner' | 'agent' | null>(null)
 
   const { data: opportunity, isLoading, error, refetch } = useQuery({
     queryKey: ['opportunity', id],
@@ -113,17 +114,42 @@ export default function OpportunityDetailPage() {
 
         <dl className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-4">
           <Fact label="Estimated value" value={money(opportunity.estimated_value)} />
-          <Fact label="Owner" value={opportunity.owner?.name ?? 'Unassigned'} />
+          <Fact
+            label="Owner"
+            value={
+              <span className="flex items-center gap-1.5">
+                {opportunity.owner?.name ?? 'Unassigned'}
+                {can('opportunity.assign.owner') && (
+                  <button
+                    onClick={() => setReassigning('owner')}
+                    className="text-xs font-medium text-brand-600 hover:underline"
+                  >
+                    Change
+                  </button>
+                )}
+              </span>
+            }
+          />
           <Fact
             label="Referral agent"
             value={
-              opportunity.referral_agent ? (
-                <Link to={`/agents/${opportunity.referral_agent.id}`} className="hover:text-brand-600 hover:underline">
-                  {opportunity.referral_agent.name}
-                </Link>
-              ) : (
-                'None'
-              )
+              <span className="flex items-center gap-1.5">
+                {opportunity.referral_agent ? (
+                  <Link to={`/agents/${opportunity.referral_agent.id}`} className="hover:text-brand-600 hover:underline">
+                    {opportunity.referral_agent.name}
+                  </Link>
+                ) : (
+                  'None'
+                )}
+                {can('opportunity.assign.agent') && (
+                  <button
+                    onClick={() => setReassigning('agent')}
+                    className="text-xs font-medium text-brand-600 hover:underline"
+                  >
+                    Change
+                  </button>
+                )}
+              </span>
             }
           />
           <Fact label="Source" value={opportunity.lead_source?.name ?? 'Not recorded'} />
@@ -214,7 +240,12 @@ export default function OpportunityDetailPage() {
                     : 'border-transparent text-slate-500 hover:text-slate-900',
                 )}
               >
-                {entry === 'timeline' ? 'Timeline' : entry === 'tasks' ? 'Tasks' : 'Stage history'}
+                {entry === 'timeline' ? 'Timeline' : entry === 'history' ? 'Stage history' : 'Tasks'}
+                {entry === 'tasks' && (opportunity.open_tasks_count ?? 0) > 0 && (
+                  <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
+                    {opportunity.open_tasks_count}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -285,7 +316,86 @@ export default function OpportunityDetailPage() {
       />
       <LogActivityModal open={addingNote} onClose={() => setAddingNote(false)} opportunityId={opportunity.id} />
       <QuickTaskModal open={addingTask} onClose={() => setAddingTask(false)} opportunityId={opportunity.id} />
+      {reassigning && (
+        <ReassignModal
+          kind={reassigning}
+          onClose={() => setReassigning(null)}
+          opportunityId={opportunity.id}
+          currentId={reassigning === 'owner' ? opportunity.owner?.id : opportunity.referral_agent?.id}
+        />
+      )}
     </>
+  )
+}
+
+/** Owner and referral agent reassignment, both audited server-side. */
+function ReassignModal({
+  kind,
+  onClose,
+  opportunityId,
+  currentId,
+}: {
+  kind: 'owner' | 'agent'
+  onClose: () => void
+  opportunityId: string
+  currentId?: string
+}) {
+  const queryClient = useQueryClient()
+  const [selected, setSelected] = useState(currentId ?? '')
+
+  const { data: users } = useQuery({
+    queryKey: ['users', 'options'],
+    queryFn: () => userApi.list({ per_page: 200 }),
+    enabled: kind === 'owner',
+  })
+  const { data: agents } = useQuery({
+    queryKey: ['agents', 'options'],
+    queryFn: () => agentApi.list({ per_page: 200 }),
+    enabled: kind === 'agent',
+  })
+
+  const save = useMutation({
+    mutationFn: () =>
+      kind === 'owner'
+        ? opportunityApi.assignOwner(opportunityId, selected)
+        : opportunityApi.assignAgent(opportunityId, selected || null),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] })
+      void queryClient.invalidateQueries({ queryKey: ['timeline', opportunityId] })
+      void queryClient.invalidateQueries({ queryKey: ['opportunities'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      onClose()
+    },
+  })
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={kind === 'owner' ? 'Change owner' : 'Change referral agent'}
+      description="The change is recorded on the timeline and in the audit log."
+      width="sm"
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => save.mutate()}
+          confirmLabel="Reassign"
+          pending={save.isPending}
+        />
+      }
+    >
+      <Field label={kind === 'owner' ? 'Owner' : 'Referral agent'} required={kind === 'owner'}>
+        <Select value={selected} onChange={(event) => setSelected(event.target.value)} autoFocus>
+          {kind === 'agent' && <option value="">None</option>}
+          {kind === 'owner' && <option value="">Select a user…</option>}
+          {(kind === 'owner' ? users?.data : agents?.data)?.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </Modal>
   )
 }
 

@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Domain\Opportunity\Enums\Priority;
 use App\Domain\Task\Enums\TaskStatus;
 use App\Domain\Task\Models\Task;
+use App\Support\OrganizationClock;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -37,8 +38,12 @@ class TaskFactory extends Factory
         ]);
     }
 
+    /** Late today in the organization's own calendar day, not the server's. */
     public function dueToday(): static
     {
-        return $this->state(fn () => ['due_at' => now()->setTime(17, 0), 'status' => TaskStatus::ToDo->value]);
+        return $this->state(fn () => [
+            'due_at' => app(OrganizationClock::class)->now()->setTime(17, 0)->utc(),
+            'status' => TaskStatus::ToDo->value,
+        ]);
     }
 }

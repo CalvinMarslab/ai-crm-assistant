@@ -80,7 +80,22 @@ class OpportunityController extends Controller
     {
         $this->authorize('create', Opportunity::class);
 
-        $opportunity = $this->opportunities->create($this->resolveReferences($request->validated()));
+        $data = $this->resolveReferences($request->validated());
+
+        // A referral agent submits leads under their own name only. Without this
+        // they could credit a lead to a colleague, or to nobody, and then lose
+        // sight of it entirely because their own visibility is referral-based.
+        $user = $request->user();
+
+        if (! $user->canDo(PermissionCode::OpportunityViewAll) && $user->canDo(PermissionCode::OpportunityViewOwnReferrals)) {
+            $agentId = $user->agentProfile?->id;
+
+            abort_if($agentId === null, 403, 'Your account is not linked to an agent profile.');
+
+            $data['referral_agent_id'] = $agentId;
+        }
+
+        $opportunity = $this->opportunities->create($data);
 
         return (new OpportunityResource($opportunity))->response()->setStatusCode(201);
     }
@@ -162,7 +177,8 @@ class OpportunityController extends Controller
         $this->authorize('assignOwner', $opportunity);
 
         $validated = $request->validate([
-            'owner_id' => ['required', 'uuid', \Illuminate\Validation\Rule::exists(User::class, 'uuid')],
+            'owner_id' => ['required', 'uuid', \Illuminate\Validation\Rule::exists(User::class, 'uuid')
+                ->where('organization_id', \App\Support\OrganizationContext::id())],
         ]);
 
         $owner = User::whereUuid($validated['owner_id'])->firstOrFail();

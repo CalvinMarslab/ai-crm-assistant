@@ -7,6 +7,12 @@ use Illuminate\Validation\Rule;
 
 class StoreAgentRequest extends FormRequest
 {
+    /** Authorization runs before validation, so a denied caller gets 403, not 422. */
+    public function authorize(): bool
+    {
+        return $this->user()?->can('create', Agent::class) ?? false;
+    }
+
     /**
      * @return array<string, mixed>
      */

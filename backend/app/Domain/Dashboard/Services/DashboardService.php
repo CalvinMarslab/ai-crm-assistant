@@ -9,6 +9,7 @@ use App\Domain\Opportunity\Services\OpportunityHygieneService;
 use App\Domain\Pipeline\Enums\StageType;
 use App\Domain\Task\Models\Task;
 use App\Models\User;
+use App\Support\OrganizationClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,7 @@ class DashboardService
 {
     public function __construct(
         private readonly OpportunityHygieneService $hygiene,
+        private readonly OrganizationClock $clock,
     ) {}
 
     /**
@@ -39,6 +41,7 @@ class DashboardService
                 'without_next_action' => $this->withoutNextAction($user),
                 'proposals_awaiting_response' => $this->proposalsAwaitingResponse($user),
                 'high_value_at_risk' => $this->highValueAtRisk($user),
+                'top_value_open' => $this->topValueOpen($user),
                 'recently_inactive' => $this->recentlyInactive($user),
             ],
             'metrics' => $this->metrics($user),
@@ -46,6 +49,7 @@ class DashboardService
             'recent_activity' => $this->recentActivity($user),
             'meta' => [
                 'inactivity_threshold_days' => $this->hygiene->inactivityThresholdDays(),
+                'timezone' => $this->clock->timezone(),
                 'generated_at' => now()->toIso8601String(),
             ],
         ];
@@ -81,7 +85,7 @@ class DashboardService
     public function followUpsDue(User $user, int $limit = 10): Collection
     {
         return $this->opportunityScope($user)
-            ->followUpDueBy(now()->endOfDay())
+            ->followUpDueBy($this->clock->endOfToday())
             ->with($this->opportunityRelations())
             ->orderBy('next_follow_up_at')
             ->limit($limit)
@@ -121,7 +125,7 @@ class DashboardService
      */
     public function highValueAtRisk(User $user, int $limit = 5): Collection
     {
-        $threshold = now()->subDays($this->hygiene->inactivityThresholdDays());
+        $threshold = $this->clock->daysAgo($this->hygiene->inactivityThresholdDays());
 
         return $this->opportunityScope($user)
             ->open()
@@ -138,12 +142,29 @@ class DashboardService
     }
 
     /**
+     * The biggest live deals, regardless of health — the owner's "what is most
+     * at stake right now" question.
+     *
+     * @return Collection<int, Opportunity>
+     */
+    public function topValueOpen(User $user, int $limit = 5): Collection
+    {
+        return $this->opportunityScope($user)
+            ->open()
+            ->whereNotNull('estimated_value')
+            ->with($this->opportunityRelations())
+            ->orderByDesc('estimated_value')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
      * @return Collection<int, Opportunity>
      */
     public function recentlyInactive(User $user, int $limit = 10): Collection
     {
         return $this->opportunityScope($user)
-            ->inactiveSince(now()->subDays($this->hygiene->inactivityThresholdDays()))
+            ->inactiveSince($this->clock->daysAgo($this->hygiene->inactivityThresholdDays()))
             ->with($this->opportunityRelations())
             ->orderBy(DB::raw('COALESCE(last_contact_at, updated_at)'))
             ->limit($limit)
@@ -155,7 +176,7 @@ class DashboardService
      */
     public function metrics(User $user): array
     {
-        $monthStart = now()->startOfMonth();
+        $monthStart = $this->clock->now()->startOfMonth()->utc();
 
         $won = (clone $this->opportunityScope($user))->where('status', StageType::Won->value);
         $lost = (clone $this->opportunityScope($user))->where('status', StageType::Lost->value);

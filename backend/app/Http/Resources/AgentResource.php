@@ -7,12 +7,21 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class AgentResource extends JsonResource
 {
+    /** @var array<string, mixed>|null */
+    private ?array $stats = null;
+
     /**
-     * @param  array<string, mixed>|null  $stats
+     * Attached fluently rather than through the constructor: collection
+     * mapping instantiates resources with (item, key), so a second
+     * constructor parameter would receive the collection key.
+     *
+     * @param  array<string, mixed>  $stats
      */
-    public function __construct($resource, private readonly ?array $stats = null)
+    public function withStats(array $stats): self
     {
-        parent::__construct($resource);
+        $this->stats = $stats;
+
+        return $this;
     }
 
     /**

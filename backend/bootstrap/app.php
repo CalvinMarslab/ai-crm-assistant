@@ -13,7 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->api(append: [
+        // Prepended so the tenant scope is active before SubstituteBindings
+        // resolves any route-model binding.
+        $middleware->api(prepend: [
             \App\Http\Middleware\SetOrganizationContext::class,
         ]);
     })

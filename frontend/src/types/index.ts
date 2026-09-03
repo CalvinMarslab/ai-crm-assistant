@@ -230,10 +230,11 @@ export interface Dashboard {
     without_next_action: Opportunity[]
     proposals_awaiting_response: Opportunity[]
     high_value_at_risk: Opportunity[]
+    top_value_open: Opportunity[]
     recently_inactive: Opportunity[]
   }
   metrics: DashboardMetrics
   stage_distribution: { stage: string; code: string; stage_type: StageType; count: number; value: number }[]
   recent_activity: Activity[]
-  meta: { inactivity_threshold_days: number; generated_at: string }
+  meta: { inactivity_threshold_days: number; timezone: string; generated_at: string }
 }
