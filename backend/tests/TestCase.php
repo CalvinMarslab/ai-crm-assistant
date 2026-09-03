@@ -18,9 +18,18 @@ abstract class TestCase extends BaseTestCase
 {
     protected Organization $organization;
 
+    /**
+     * Fixed clock for the whole suite. Much of this domain is time-relative
+     * (overdue, due today, upcoming, inactive), so without a frozen "now" the
+     * results depend on what time of day the suite happens to run.
+     */
+    protected const NOW = '2026-06-15 09:00:00';
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->travelTo(self::NOW);
 
         $this->seed([PermissionSeeder::class, RoleSeeder::class, OrganizationSeeder::class]);
 
@@ -31,6 +40,8 @@ abstract class TestCase extends BaseTestCase
     protected function tearDown(): void
     {
         OrganizationContext::clear();
+
+        $this->travelBack();
 
         parent::tearDown();
     }
