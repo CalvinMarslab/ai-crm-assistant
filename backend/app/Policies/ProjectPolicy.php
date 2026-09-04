@@ -42,6 +42,26 @@ class ProjectPolicy
         return false;
     }
 
+    /**
+     * Delivery detail: tasks, timeline, handover checklist and the handover
+     * brief.
+     *
+     * Separate from view() on purpose. A referral agent may see that a project
+     * exists and roughly where it is, because that is the "high-level project
+     * progress" USER_ROLES_PERMISSION.md allows them. It does not follow that
+     * they may read internal tasks, internal notes, or who is doing what —
+     * the same document says an agent cannot view internal tasks or notes.
+     */
+    public function viewInternals(User $user, Project $project): bool
+    {
+        if ($user->canDo(PermissionCode::ProjectViewAll)) {
+            return true;
+        }
+
+        return $user->canDo(PermissionCode::ProjectViewAssigned)
+            && $project->project_manager_user_id === $user->id;
+    }
+
     public function create(User $user): bool
     {
         return $user->canDo(PermissionCode::ProjectCreate);

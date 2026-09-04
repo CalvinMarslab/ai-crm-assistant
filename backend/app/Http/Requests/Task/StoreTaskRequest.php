@@ -4,6 +4,7 @@ namespace App\Http\Requests\Task;
 
 use App\Domain\Opportunity\Enums\Priority;
 use App\Domain\Task\Enums\TaskStatus;
+use App\Domain\Task\Services\TaskSubjectResolver;
 use App\Models\User;
 use App\Support\OrganizationContext;
 use Illuminate\Foundation\Http\FormRequest;
@@ -27,7 +28,9 @@ class StoreTaskRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:10000'],
             'assigned_user_id' => ['nullable', 'uuid', Rule::exists(User::class, 'uuid')
                 ->where('organization_id', OrganizationContext::id())],
-            'subject_type' => ['nullable', 'string', Rule::in(['opportunity', 'company', 'contact', 'project'])],
+            // Both halves travel together; one without the other cannot
+            // identify a record, on create or on re-bind.
+            'subject_type' => ['nullable', 'string', 'required_with:subject_id', Rule::in(TaskSubjectResolver::types())],
             'subject_id' => ['nullable', 'uuid', 'required_with:subject_type'],
             'priority' => ['sometimes', Rule::enum(Priority::class)],
             'status' => ['sometimes', Rule::enum(TaskStatus::class)],

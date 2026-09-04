@@ -20,6 +20,7 @@ use App\Http\Resources\HandoverItemResource;
 use App\Http\Resources\ProjectResource;
 use App\Http\Resources\TaskResource;
 use App\Models\User;
+use App\Rules\ValidProjectManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -130,8 +131,7 @@ class ProjectController extends Controller
         $this->authorize('assignManager', $project);
 
         $validated = $request->validate([
-            'manager_id' => ['nullable', 'uuid', Rule::exists(User::class, 'uuid')
-                ->where('organization_id', \App\Support\OrganizationContext::id())],
+            'manager_id' => ['nullable', 'uuid', new ValidProjectManager],
         ]);
 
         $manager = empty($validated['manager_id'])
@@ -157,7 +157,7 @@ class ProjectController extends Controller
 
     public function handoverItems(Project $project): AnonymousResourceCollection
     {
-        $this->authorize('view', $project);
+        $this->authorize('viewInternals', $project);
 
         return HandoverItemResource::collection($project->handoverItems()->with('assignee')->get());
     }
@@ -199,7 +199,7 @@ class ProjectController extends Controller
 
     public function timeline(Request $request, Project $project): AnonymousResourceCollection
     {
-        $this->authorize('view', $project);
+        $this->authorize('viewInternals', $project);
 
         $activities = $project->activities()
             ->visibleTo($request->user())
@@ -211,7 +211,7 @@ class ProjectController extends Controller
 
     public function tasks(Project $project): AnonymousResourceCollection
     {
-        $this->authorize('view', $project);
+        $this->authorize('viewInternals', $project);
 
         return TaskResource::collection(
             $project->tasks()->with(['assignee:id,uuid,name'])->orderByRaw('due_at IS NULL, due_at ASC')->get()
@@ -224,7 +224,7 @@ class ProjectController extends Controller
      */
     public function handoverBrief(Request $request, Project $project): JsonResponse
     {
-        $this->authorize('view', $project);
+        $this->authorize('viewInternals', $project);
 
         $project->load(['company', 'primaryContact', 'opportunity.stageHistory.toStage', 'handoverItems.assignee']);
 

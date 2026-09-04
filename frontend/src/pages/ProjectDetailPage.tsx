@@ -415,9 +415,10 @@ function ManagerModal({
   const queryClient = useQueryClient()
   const [selected, setSelected] = useState(currentId ?? '')
 
+  // Only users the server will accept as a project manager.
   const { data: users } = useQuery({
-    queryKey: ['users', 'options'],
-    queryFn: () => userApi.list({ per_page: 200 }),
+    queryKey: ['users', 'project-managers'],
+    queryFn: () => userApi.list({ per_page: 200, role: 'project_manager', active: true }),
     enabled: open,
   })
 

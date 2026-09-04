@@ -8,6 +8,7 @@ use App\Domain\Identity\Enums\PermissionCode;
 use App\Domain\Opportunity\Models\Opportunity;
 use App\Domain\Task\Models\Task;
 use App\Domain\Task\Services\TaskService;
+use App\Domain\Task\Services\TaskSubjectResolver;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
@@ -20,15 +21,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TaskController extends Controller
 {
-    /** API subject aliases to their models, matching the enforced morph map. */
-    private const SUBJECTS = [
-        'opportunity' => Opportunity::class,
-        'company' => Company::class,
-        'contact' => Contact::class,
-        'project' => \App\Domain\Project\Models\Project::class,
-    ];
-
-    public function __construct(private readonly TaskService $tasks) {}
+    public function __construct(
+        private readonly TaskService $tasks,
+        private readonly TaskSubjectResolver $subjects,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -47,11 +43,17 @@ class TaskController extends Controller
             ->when($request->boolean('upcoming'), fn (Builder $q) => $q->upcoming($request->integer('upcoming_days', 7)))
             ->when($request->boolean('unassigned'), fn (Builder $q) => $q->unassigned())
             ->when($request->filled('subject_type') && $request->filled('subject_id'), function (Builder $q) use ($request) {
-                $subject = $this->resolveSubject($request->string('subject_type')->toString(), $request->string('subject_id')->toString());
+                $type = $request->string('subject_type')->toString();
+                $model = TaskSubjectResolver::SUBJECTS[$type] ?? null;
+                $subjectId = $model === null
+                    ? null
+                    : $model::query()->where('uuid', $request->string('subject_id'))->value('id');
 
-                return $subject === null
+                // A filter, not a write: an unmatched subject simply returns
+                // nothing rather than erroring.
+                return $subjectId === null
                     ? $q->whereRaw('1 = 0')
-                    : $q->where('subject_type', $request->string('subject_type'))->where('subject_id', $subject);
+                    : $q->where('subject_type', $type)->where('subject_id', $subjectId);
             })
             ->with(['assignee:id,uuid,name', 'creator:id,uuid,name', 'subject'])
             ->orderByRaw('due_at IS NULL, due_at ASC')
@@ -116,6 +118,9 @@ class TaskController extends Controller
     }
 
     /**
+     * Translates the API's uuids into keys, and authorizes the subject before
+     * the task is written. Used by both store and update.
+     *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
@@ -128,16 +133,11 @@ class TaskController extends Controller
         }
 
         if (! empty($data['subject_type']) && ! empty($data['subject_id'])) {
-            $data['subject_id'] = $this->resolveSubject($data['subject_type'], $data['subject_id']);
+            $data['subject_id'] = $this->subjects
+                ->resolveAuthorized($data['subject_type'], $data['subject_id'])
+                ->getKey();
         }
 
         return $data;
-    }
-
-    private function resolveSubject(string $type, string $uuid): ?int
-    {
-        $model = self::SUBJECTS[$type] ?? null;
-
-        return $model === null ? null : $model::whereUuid($uuid)->value('id');
     }
 }

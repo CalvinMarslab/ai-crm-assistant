@@ -387,9 +387,10 @@ function ConvertToProjectModal({
   const [targetEnd, setTargetEnd] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Only users the server will accept as a project manager.
   const { data: users } = useQuery({
-    queryKey: ['users', 'options'],
-    queryFn: () => userApi.list({ per_page: 200 }),
+    queryKey: ['users', 'project-managers'],
+    queryFn: () => userApi.list({ per_page: 200, role: 'project_manager', active: true }),
     enabled: open,
   })
 
@@ -436,7 +437,11 @@ function ConvertToProjectModal({
           <Field
             label="Project manager"
             error={errors.project_manager_id}
-            hint="They are notified and inherit the handover checklist."
+            hint={
+              users?.data.length === 0
+                ? 'No project managers exist yet. You can assign one later from the project.'
+                : 'They are notified and inherit the handover checklist.'
+            }
           >
             <Select value={managerId} onChange={(event) => setManagerId(event.target.value)}>
               <option value="">Assign later</option>

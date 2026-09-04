@@ -3,8 +3,7 @@
 namespace App\Http\Requests\Project;
 
 use App\Domain\Project\Models\Project;
-use App\Models\User;
-use App\Support\OrganizationContext;
+use App\Rules\ValidProjectManager;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -23,8 +22,7 @@ class ConvertOpportunityRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'project_manager_id' => ['nullable', 'uuid', Rule::exists(User::class, 'uuid')
-                ->where('organization_id', OrganizationContext::id())],
+            'project_manager_id' => ['nullable', 'uuid', new ValidProjectManager],
             'summary' => ['nullable', 'string', 'max:5000'],
             'requirements' => ['nullable', 'string', 'max:20000'],
             'start_date' => ['nullable', 'date'],

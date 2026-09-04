@@ -23,6 +23,12 @@ class UserController extends Controller
         $users = User::query()
             ->where('organization_id', OrganizationContext::id())
             ->when($request->filled('search'), fn ($q) => $q->where('name', 'like', '%'.$request->string('search').'%'))
+            // Lets a picker offer only the users eligible for a role, so the
+            // client is not left guessing what the server will accept.
+            ->when($request->filled('role'), fn ($q) => $q->whereHas(
+                'roles', fn ($r) => $r->where('code', $request->string('role'))
+            ))
+            ->when($request->boolean('active'), fn ($q) => $q->where('status', 'active'))
             ->with('roles')
             ->orderBy('name')
             ->paginate($request->integer('per_page', 25));
