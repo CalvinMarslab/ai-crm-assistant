@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Prepended so the tenant scope is active before SubstituteBindings
         // resolves any route-model binding.
         $middleware->api(prepend: [
+            \App\Http\Middleware\ForceJsonResponse::class,
             \App\Http\Middleware\SetOrganizationContext::class,
         ]);
     })
@@ -23,4 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Belt and braces alongside ForceJsonResponse: an authentication
+        // failure on an API route is always a 401, never a redirect.
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return $request->is('api/*')
+                ? response()->json(['message' => 'Unauthenticated.'], 401)
+                : null;
+        });
     })->create();

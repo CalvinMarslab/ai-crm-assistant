@@ -105,7 +105,7 @@ class OpportunityController extends Controller
         $this->authorize('view', $opportunity);
 
         return new OpportunityResource($opportunity->load([
-            'company', 'primaryContact', 'stage', 'owner', 'referralAgent', 'leadSource',
+            'company', 'primaryContact', 'stage', 'owner', 'referralAgent', 'leadSource', 'project',
         ])->loadCount('openTasks'));
     }
 

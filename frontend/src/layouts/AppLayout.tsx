@@ -14,10 +14,17 @@ interface NavItem {
   permission?: string
 }
 
+/**
+ * A referral agent's application is just the portal, so they get their own
+ * short list rather than the staff navigation with most items filtered out.
+ */
+const portalNavigation: NavItem[] = [{ to: '/', label: 'My referrals', icon: '◫' }]
+
 const navigation: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: '◫' },
   { to: '/pipeline', label: 'Pipeline', icon: '▤' },
   { to: '/opportunities', label: 'Opportunities', icon: '◈' },
+  { to: '/projects', label: 'Projects', icon: '▣', permission: 'project.view.assigned' },
   { to: '/tasks', label: 'Tasks', icon: '✓', permission: 'task.view.own' },
   { to: '/companies', label: 'Companies', icon: '⌂', permission: 'company.view.all' },
   { to: '/contacts', label: 'Contacts', icon: '☺', permission: 'contact.view.all' },
@@ -36,10 +43,13 @@ export function AppLayout() {
     refetchInterval: 60_000,
   })
 
-  const visible = navigation.filter((item) => {
+  const isPortalOnly = can('portal.access') && !can('opportunity.view.all')
+
+  const visible = (isPortalOnly ? portalNavigation : navigation).filter((item) => {
     if (!item.permission) return true
     // Task visibility is granted by either of two codes.
     if (item.permission === 'task.view.own') return can('task.view.own') || can('task.view.all')
+    if (item.permission === 'project.view.assigned') return can('project.view.assigned') || can('project.view.all')
     return can(item.permission)
   })
 

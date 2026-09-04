@@ -1,19 +1,20 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { agentApi, opportunityApi, taskApi, userApi } from '@/api/endpoints'
+import { agentApi, opportunityApi, projectApi, taskApi, userApi } from '@/api/endpoints'
 import { errorMessage, validationErrors } from '@/api/client'
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Spinner, Textarea, cx } from '@/components/ui'
 import { Modal, ModalFooter } from '@/components/Modal'
 import { StageBadge, TaskRow, WarningBadges } from '@/components/OpportunityBits'
 import { Timeline } from '@/components/Timeline'
+import { Documents } from '@/components/Documents'
 import { OpportunityFormModal } from '@/features/OpportunityFormModal'
 import { StageChangeModal } from '@/features/StageChangeModal'
 import { dateTime, money, relative, shortDate, titleCase } from '@/lib/format'
 import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
 
-type Tab = 'timeline' | 'tasks' | 'history'
+type Tab = 'timeline' | 'tasks' | 'documents' | 'history'
 
 export default function OpportunityDetailPage() {
   const { id = '' } = useParams()
@@ -27,6 +28,7 @@ export default function OpportunityDetailPage() {
   const [addingNote, setAddingNote] = useState(false)
   const [addingTask, setAddingTask] = useState(false)
   const [reassigning, setReassigning] = useState<'owner' | 'agent' | null>(null)
+  const [converting, setConverting] = useState(false)
 
   const { data: opportunity, isLoading, error, refetch } = useQuery({
     queryKey: ['opportunity', id],
@@ -65,6 +67,8 @@ export default function OpportunityDetailPage() {
   if (!opportunity) return null
 
   const canUpdate = can('opportunity.update')
+  // Returned by the API once a won deal has been converted.
+  const project = opportunity.project ?? null
 
   return (
     <>
@@ -203,9 +207,26 @@ export default function OpportunityDetailPage() {
           </p>
         )}
         {opportunity.status === 'won' && (
-          <p className="mt-3 rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200">
-            <span className="font-medium">Won</span> {shortDate(opportunity.won_at)} at {money(opportunity.final_value)}
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+            <p className="text-sm text-emerald-800">
+              <span className="font-medium">Won</span> {shortDate(opportunity.won_at)} at{' '}
+              {money(opportunity.final_value)}
+            </p>
+            {project ? (
+              <Link
+                to={`/projects/${project.id}`}
+                className="text-sm font-medium text-emerald-800 underline hover:text-emerald-900"
+              >
+                Open project →
+              </Link>
+            ) : (
+              can('project.create') && (
+                <Button size="sm" onClick={() => setConverting(true)}>
+                  Convert to project
+                </Button>
+              )
+            )}
+          </div>
         )}
       </Card>
 
@@ -229,7 +250,7 @@ export default function OpportunityDetailPage() {
       <Card>
         <div className="flex items-center justify-between border-b border-slate-200 px-4">
           <nav className="flex gap-1">
-            {(['timeline', 'tasks', 'history'] as Tab[]).map((entry) => (
+            {(['timeline', 'tasks', 'documents', 'history'] as Tab[]).map((entry) => (
               <button
                 key={entry}
                 onClick={() => setTab(entry)}
@@ -240,7 +261,13 @@ export default function OpportunityDetailPage() {
                     : 'border-transparent text-slate-500 hover:text-slate-900',
                 )}
               >
-                {entry === 'timeline' ? 'Timeline' : entry === 'history' ? 'Stage history' : 'Tasks'}
+                {entry === 'timeline'
+                  ? 'Timeline'
+                  : entry === 'history'
+                    ? 'Stage history'
+                    : entry === 'documents'
+                      ? 'Documents'
+                      : 'Tasks'}
                 {entry === 'tasks' && (opportunity.open_tasks_count ?? 0) > 0 && (
                   <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
                     {opportunity.open_tasks_count}
@@ -282,6 +309,8 @@ export default function OpportunityDetailPage() {
               </div>
             ))}
 
+          {tab === 'documents' && <Documents subjectType="opportunity" subjectId={opportunity.id} />}
+
           {tab === 'history' &&
             (!history.length ? (
               <EmptyState message="No stage changes recorded." />
@@ -316,6 +345,12 @@ export default function OpportunityDetailPage() {
       />
       <LogActivityModal open={addingNote} onClose={() => setAddingNote(false)} opportunityId={opportunity.id} />
       <QuickTaskModal open={addingTask} onClose={() => setAddingTask(false)} opportunityId={opportunity.id} />
+      <ConvertToProjectModal
+        open={converting}
+        onClose={() => setConverting(false)}
+        opportunityId={opportunity.id}
+        defaultName={opportunity.title}
+      />
       {reassigning && (
         <ReassignModal
           kind={reassigning}
@@ -325,6 +360,104 @@ export default function OpportunityDetailPage() {
         />
       )}
     </>
+  )
+}
+
+/**
+ * Converting a won deal into a project (PRD section 14). Company, contact,
+ * requirements and the commercial reference are copied by the server; the
+ * opportunity keeps its own timeline.
+ */
+function ConvertToProjectModal({
+  open,
+  onClose,
+  opportunityId,
+  defaultName,
+}: {
+  open: boolean
+  onClose: () => void
+  opportunityId: string
+  defaultName: string
+}) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [name, setName] = useState(defaultName)
+  const [managerId, setManagerId] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [targetEnd, setTargetEnd] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const { data: users } = useQuery({
+    queryKey: ['users', 'options'],
+    queryFn: () => userApi.list({ per_page: 200 }),
+    enabled: open,
+  })
+
+  const convert = useMutation({
+    mutationFn: () =>
+      projectApi.convert(opportunityId, {
+        name,
+        project_manager_id: managerId || null,
+        start_date: startDate || null,
+        target_end_date: targetEnd || null,
+      }),
+    onSuccess: (project) => {
+      void queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] })
+      void queryClient.invalidateQueries({ queryKey: ['projects'] })
+      onClose()
+      navigate(`/projects/${project.id}`)
+    },
+    onError: (error) => setErrors(validationErrors(error)),
+  })
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Convert to project"
+      description="Company, contact, requirements and the quotation reference are carried over. A handover checklist is created."
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onConfirm={() => convert.mutate()}
+          confirmLabel="Create project"
+          pending={convert.isPending}
+        />
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <Field label="Project name" required error={errors.name}>
+            <Input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+          </Field>
+        </div>
+
+        <div className="sm:col-span-2">
+          <Field
+            label="Project manager"
+            error={errors.project_manager_id}
+            hint="They are notified and inherit the handover checklist."
+          >
+            <Select value={managerId} onChange={(event) => setManagerId(event.target.value)}>
+              <option value="">Assign later</option>
+              {users?.data.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+
+        <Field label="Start date" error={errors.start_date}>
+          <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        </Field>
+
+        <Field label="Target end date" error={errors.target_end_date}>
+          <Input type="date" value={targetEnd} onChange={(event) => setTargetEnd(event.target.value)} />
+        </Field>
+      </div>
+    </Modal>
   )
 }
 

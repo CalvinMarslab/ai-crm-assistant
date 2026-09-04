@@ -25,3 +25,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Uploaded documents (Phase 2) — never commit customer files
+/storage/app/private/documents

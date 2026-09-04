@@ -25,6 +25,14 @@ enum ActivityType: string
     case TaskCreated = 'task.created';
     case TaskCompleted = 'task.completed';
     case TaskReopened = 'task.reopened';
+    // Projects (Phase 2)
+    case ProjectCreated = 'project.created';
+    case ProjectUpdated = 'project.updated';
+    case ProjectStatusChanged = 'project.status_changed';
+    case ProjectManagerAssigned = 'project.manager_assigned';
+    case ProjectCompleted = 'project.completed';
+    case HandoverItemUpdated = 'project.handover_item_updated';
+
     case CompanyCreated = 'company.created';
     case ContactCreated = 'contact.created';
 

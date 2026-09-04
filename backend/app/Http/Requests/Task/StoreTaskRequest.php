@@ -27,7 +27,7 @@ class StoreTaskRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:10000'],
             'assigned_user_id' => ['nullable', 'uuid', Rule::exists(User::class, 'uuid')
                 ->where('organization_id', OrganizationContext::id())],
-            'subject_type' => ['nullable', 'string', Rule::in(['opportunity', 'company', 'contact'])],
+            'subject_type' => ['nullable', 'string', Rule::in(['opportunity', 'company', 'contact', 'project'])],
             'subject_id' => ['nullable', 'uuid', 'required_with:subject_type'],
             'priority' => ['sometimes', Rule::enum(Priority::class)],
             'status' => ['sometimes', Rule::enum(TaskStatus::class)],

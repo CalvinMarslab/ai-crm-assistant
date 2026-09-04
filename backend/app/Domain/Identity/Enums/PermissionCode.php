@@ -46,6 +46,26 @@ enum PermissionCode: string
     case UserViewAll = 'user.view.all';
     case UserManage = 'user.manage';
 
+    // Projects and handover (Phase 2)
+    case ProjectViewAll = 'project.view.all';
+    case ProjectViewAssigned = 'project.view.assigned';
+    case ProjectViewOwnReferrals = 'project.view.own_referrals';
+    case ProjectCreate = 'project.create';
+    case ProjectUpdate = 'project.update';
+    case ProjectDelete = 'project.delete';
+    case ProjectAssignManager = 'project.assign.manager';
+    case ProjectUpdateStatus = 'project.status.update';
+    case ProjectManageHandover = 'project.handover.manage';
+    case ProjectViewFinancials = 'project.financials.view';
+
+    // Documents (Phase 2)
+    case DocumentView = 'document.view';
+    case DocumentUpload = 'document.upload';
+    case DocumentDelete = 'document.delete';
+
+    // Agent portal (Phase 2)
+    case PortalAccess = 'portal.access';
+
     // Dashboard, audit, notifications
     case DashboardViewOwner = 'dashboard.view.owner';
     case AuditView = 'audit.view';

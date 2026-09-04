@@ -25,6 +25,7 @@ class TaskController extends Controller
         'opportunity' => Opportunity::class,
         'company' => Company::class,
         'contact' => Contact::class,
+        'project' => \App\Domain\Project\Models\Project::class,
     ];
 
     public function __construct(private readonly TaskService $tasks) {}

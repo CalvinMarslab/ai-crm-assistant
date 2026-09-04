@@ -1,11 +1,17 @@
-# AI CRM Assistant — Phase 1
+# AI CRM Assistant — Phases 1–2
 
-An AI-assisted CRM and business execution system. Phase 1 delivers the foundation
-and core CRM: the owner can run the full lead lifecycle from referral to won/lost
-without keeping a separate to-do list.
+An AI-assisted CRM and business execution system.
 
-Built strictly to `DEVELOPMENT_PHASES.md` Phase 1. The AI assistant, Telegram,
-project handover, and the agent portal belong to later phases and are not built here.
+**Phase 1** delivers the foundation and core CRM: the owner runs the full lead
+lifecycle from referral to won/lost without keeping a separate to-do list.
+
+**Phase 2** carries a won deal into delivery and opens the door to referral
+agents: convert to project, assign a PM, work a handover checklist, track
+project status and tasks, attach documents, and give agents a portal showing
+their own referrals in simplified language.
+
+Built to `DEVELOPMENT_PHASES.md`. The AI assistant, Telegram, email, calendar
+and SaaS billing belong to later phases and are not built here.
 
 ## Stack
 
@@ -65,9 +71,10 @@ mysql -u root -e "CREATE DATABASE ai_crm_testing CHARACTER SET utf8mb4 COLLATE u
 cd backend && php artisan test
 ```
 
-98 feature tests: the `ACCEPTANCE_TEST.md` criteria, the end-to-end lead
+121 feature tests: the `ACCEPTANCE_TEST.md` criteria, the end-to-end lead
 lifecycle, tenant and role isolation, opportunity state rules, timezone handling,
-and production-safety checks.
+production-safety checks, project handover, the agent portal, and document
+storage security.
 
 The suite freezes the clock (`Tests\TestCase::NOW`) because much of this domain
 is time-relative; without that, results depend on what time of day the suite runs.
@@ -175,6 +182,12 @@ policy-gated. Entities are addressed by UUID.
 | Notifications | `GET /notifications` · `/unread-count` · `POST /{uuid}/read` · `/read-all` |
 | Audit | `GET /audit-logs` · `GET /audit-logs/{subjectType}/{uuid}` |
 | Users | `GET|POST /users` · `PATCH /users/{uuid}` · `GET /roles` |
+| **Projects** | `POST /opportunities/{uuid}/convert-to-project` · `GET /projects` · `GET|PATCH|DELETE /projects/{uuid}` |
+| ” actions | `POST /{uuid}/status` · `/manager` · `/notes` |
+| ” handover | `GET|POST /{uuid}/handover-items` · `PATCH /{uuid}/handover-items/{uuid}` · `GET /{uuid}/handover-brief` |
+| ” reads | `GET /{uuid}/timeline` · `/tasks` |
+| **Documents** | `GET|POST /documents` · `GET /documents/{uuid}/download` · `DELETE /documents/{uuid}` |
+| **Agent portal** | `GET /portal/summary` · `/portal/opportunities` · `/portal/opportunities/{uuid}` |
 
 Opportunity list filters answer the execution questions directly:
 `without_next_action`, `follow_up_due`, `awaiting_quotation_response`,
@@ -197,7 +210,13 @@ Task filters: `overdue`, `due_today`, `upcoming`, `unassigned`, `open`,
 | `/agents`, `/agents/:id` | Detail shows performance stats derived from linked opportunities |
 | `/tasks` | Grouped Overdue / Due today / Upcoming / No due date |
 | `/notifications` | In-app notification centre with unread badge |
+| `/projects`, `/projects/:id` | Handover checklist, tasks, documents, timeline, and the sales history behind the project |
 | `/settings` | Users & roles, pipeline stages, audit log |
+
+A referral agent signs in to a portal instead of the CRM: their own referrals in
+simplified language, their performance, and a progress trail. It is a separate
+route tree, not the staff app with menu items hidden, so an internal URL cannot
+be reached by typing it.
 
 Every create and edit happens in a modal, so updating an opportunity never costs a
 page navigation.
@@ -256,12 +275,37 @@ the authorization layer; login rate limiting (5/min per IP and per email) plus a
 general API limit (120/min); CORS restricted to `FRONTEND_URL`; passwords and
 tokens excluded from the audit trail; internal ids never exposed through the API.
 
-## What Phase 1 does not include
+## Phase 2 notes
 
-Per `DEVELOPMENT_PHASES.md`: project handover and the agent portal (Phase 2);
-the AI assistant and Telegram (Phase 3); email, calendar and WhatsApp (Phase 4);
-SaaS onboarding and billing (Phase 5).
+**Handover is a gate, not a label.** A project cannot leave Pending Handover
+until every checklist item is settled. Skipping it is exactly how delivery
+loses the sales context, so the rule is enforced server-side.
 
-The seams for those exist — `agent_facing_status` on stages, the `Notifier` entry
-point, organization scoping, and domain services with typed inputs — but no
-speculative code was written for them.
+**The sale keeps its own history.** Conversion copies company, contact,
+requirements and the commercial reference onto the project. It does not move
+the opportunity's timeline — that stays where it happened, and the project links
+back to it.
+
+**Agents see a different vocabulary, not a filtered view.** The portal has its
+own resource (`AgentFacingOpportunityResource`) rather than flags on the
+internal one, so the agent-facing shape is explicit and cannot widen by
+accident. Internal stage names, values, owners and notes are absent from the
+payload, not hidden in the UI.
+
+**Documents are streamed, never served.** Files are stored outside the web root
+under generated names, and every download passes the same authorization as the
+record it hangs off. Uploads are an extension allow-list.
+
+`DEVELOPMENT_PHASES.md` does not list documents under Phase 2, but
+`USER_ROLES_PERMISSION.md` gives the PM "upload documents",
+`CRM_WORKFLOW.md` §6 requires the PM to receive "relevant documents", and
+PRD §14 says "copy documents" — so they are built here as part of handover.
+
+## What is not included yet
+
+Per `DEVELOPMENT_PHASES.md`: the AI assistant and Telegram (Phase 3); email,
+calendar and WhatsApp (Phase 4); SaaS onboarding and billing (Phase 5).
+
+The seams exist — the `Notifier` entry point, organization scoping, and domain
+services with typed inputs the Phase 3 tool layer can call — but no speculative
+code was written for them.

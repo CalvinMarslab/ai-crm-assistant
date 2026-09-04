@@ -140,6 +140,8 @@ export interface Opportunity {
   won_at: string | null
   lost_at: string | null
   open_tasks_count?: number
+  /** Present once a won opportunity has been converted. */
+  project?: { id: string; name: string; status: ProjectStatus; status_label: string } | null
   warnings?: HygieneWarning[]
   created_at: string
   updated_at: string
@@ -237,4 +239,110 @@ export interface Dashboard {
   stage_distribution: { stage: string; code: string; stage_type: StageType; count: number; value: number }[]
   recent_activity: Activity[]
   meta: { inactivity_threshold_days: number; timezone: string; generated_at: string }
+}
+
+// ---- Phase 2: projects, handover, agent portal ----
+
+export type ProjectStatus =
+  | 'pending_handover'
+  | 'planning'
+  | 'in_progress'
+  | 'waiting_customer'
+  | 'internal_review'
+  | 'completed'
+  | 'on_hold'
+
+export type HandoverItemStatus = 'pending' | 'in_progress' | 'done' | 'not_applicable'
+
+export interface HandoverItem {
+  id: string
+  title: string
+  description: string | null
+  status: HandoverItemStatus
+  status_label: string
+  is_settled: boolean
+  assignee?: UserSummary | null
+  due_at: string | null
+  completed_at: string | null
+  sequence: number
+}
+
+export interface Project {
+  id: string
+  name: string
+  status: ProjectStatus
+  status_label: string
+  agent_facing_status: string
+  is_blocked: boolean
+  summary: string | null
+  /** Withheld from users without the project financials permission. */
+  requirements?: string | null
+  company?: { id: string; name: string }
+  primary_contact?: Contact | null
+  manager?: UserSummary | null
+  opportunity?: { id: string; title: string } | null
+  contract_value?: number | null
+  quotation_reference?: string | null
+  start_date: string | null
+  target_end_date: string | null
+  completed_at: string | null
+  handed_over_at: string | null
+  handover_items?: HandoverItem[]
+  handover_complete?: boolean
+  open_tasks_count?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface HandoverBrief {
+  project: Project
+  opportunity_timeline: Activity[]
+}
+
+/** The narrowed shape a referral agent receives; no stage, owner, or value. */
+export interface PortalOpportunity {
+  id: string
+  title: string
+  company?: string
+  status: string
+  is_closed: boolean
+  outcome: string | null
+  submitted_at: string
+  last_update_at: string
+  expected_close_date: string | null
+}
+
+export interface PortalSummary {
+  agent: {
+    id: string
+    name: string
+    company_name: string | null
+    status: string
+    joined_at: string | null
+  }
+  performance: {
+    introduced: number
+    active: number
+    won: number
+    lost: number
+    conversion_rate: number | null
+  }
+  status_breakdown: Record<string, number>
+}
+
+export interface PortalProgressEntry {
+  status: string
+  changed_at: string
+}
+
+export interface DocumentFile {
+  id: string
+  name: string
+  document_type: string | null
+  mime_type: string | null
+  file_size: number | null
+  is_internal: boolean
+  uploader?: UserSummary
+  subject: { type: string }
+  created_at: string
 }

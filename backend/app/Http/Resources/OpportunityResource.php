@@ -67,6 +67,14 @@ class OpportunityResource extends JsonResource
             'won_at' => $this->won_at?->toIso8601String(),
             'lost_at' => $this->lost_at?->toIso8601String(),
 
+            // Present once a won deal has been converted (Phase 2).
+            'project' => $this->whenLoaded('project', fn () => $this->project === null ? null : [
+                'id' => $this->project->uuid,
+                'name' => $this->project->name,
+                'status' => $this->project->status->value,
+                'status_label' => $this->project->status->label(),
+            ]),
+
             'open_tasks_count' => $this->whenCounted('openTasks'),
             'warnings' => $this->when(
                 $request->boolean('with_warnings', true),

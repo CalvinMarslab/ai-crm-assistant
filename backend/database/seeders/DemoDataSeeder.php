@@ -85,7 +85,52 @@ class DemoDataSeeder extends Seeder
             }
         }
 
+        $this->seedProjectHandover($pm);
+
         Auth::logout();
+    }
+
+    /**
+     * Convert the won demo opportunity into a project so the handover screens
+     * have something real to show.
+     */
+    private function seedProjectHandover(User $pm): void
+    {
+        $won = \App\Domain\Opportunity\Models\Opportunity::where('status', 'won')
+            ->whereDoesntHave('project')
+            ->first();
+
+        if ($won === null) {
+            return;
+        }
+
+        $project = app(\App\Domain\Project\Services\ProjectService::class)->convertFromOpportunity($won, [
+            'project_manager_user_id' => $pm->id,
+            'start_date' => now()->addWeek(),
+            'target_end_date' => now()->addMonths(3),
+        ]);
+
+        // Part-way through handover, so the checklist is visibly in progress.
+        $handover = app(\App\Domain\Project\Services\HandoverService::class);
+
+        foreach ($project->handoverItems()->orderBy('sequence')->take(3)->get() as $index => $item) {
+            $handover->updateItem($item, [
+                'status' => $index < 2
+                    ? \App\Domain\Project\Enums\HandoverItemStatus::Done->value
+                    : \App\Domain\Project\Enums\HandoverItemStatus::InProgress->value,
+            ]);
+        }
+
+        \App\Domain\Task\Models\Task::create([
+            'organization_id' => $project->organization_id,
+            'assigned_user_id' => $pm->id,
+            'created_by_user_id' => $pm->id,
+            'subject_type' => 'project',
+            'subject_id' => $project->id,
+            'title' => 'Schedule the kick-off call with Priya',
+            'due_at' => now()->addDays(3),
+            'priority' => 'high',
+        ]);
     }
 
     /**

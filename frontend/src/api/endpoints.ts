@@ -1,8 +1,9 @@
 import { api } from './client'
 import type {
   Activity, Agent, AgentStats, AppNotification, AuditLogEntry, Company, Contact,
-  Dashboard, LeadSource, Opportunity, Paginated, Pipeline, Role, StageHistoryEntry,
-  Task, User,
+  Dashboard, DocumentFile, HandoverBrief, HandoverItem, LeadSource, Opportunity, Paginated,
+  PortalOpportunity, PortalProgressEntry, PortalSummary, Pipeline, Project, Role,
+  StageHistoryEntry, Task, User,
 } from '@/types'
 
 type Query = Record<string, string | number | boolean | undefined | null>
@@ -80,6 +81,63 @@ export const opportunityApi = {
   timeline: (id: string) => api.get<Paginated<Activity>>(`/opportunities/${id}/timeline`).then((r) => r.data.data),
   stageHistory: (id: string) =>
     api.get<{ data: StageHistoryEntry[] }>(`/opportunities/${id}/stage-history`).then((r) => r.data.data),
+}
+
+export const projectApi = {
+  list: (query?: Query) => api.get<Paginated<Project>>('/projects', { params: params(query) }).then((r) => r.data),
+  get: (id: string) => api.get<{ data: Project }>(`/projects/${id}`).then((r) => r.data.data),
+  update: (id: string, payload: Record<string, unknown>) =>
+    api.patch<{ data: Project }>(`/projects/${id}`, payload).then((r) => r.data.data),
+  remove: (id: string) => api.delete(`/projects/${id}`).then(() => undefined),
+  convert: (opportunityId: string, payload: Record<string, unknown>) =>
+    api.post<{ data: Project }>(`/opportunities/${opportunityId}/convert-to-project`, payload).then((r) => r.data.data),
+  changeStatus: (id: string, payload: Record<string, unknown>) =>
+    api.post<{ data: Project }>(`/projects/${id}/status`, payload).then((r) => r.data.data),
+  assignManager: (id: string, managerId: string | null) =>
+    api.post<{ data: Project }>(`/projects/${id}/manager`, { manager_id: managerId }).then((r) => r.data.data),
+  addNote: (id: string, payload: Record<string, unknown>) =>
+    api.post(`/projects/${id}/notes`, payload).then(() => undefined),
+  handoverItems: (id: string) =>
+    api.get<{ data: HandoverItem[] }>(`/projects/${id}/handover-items`).then((r) => r.data.data),
+  addHandoverItem: (id: string, payload: Record<string, unknown>) =>
+    api.post<{ data: HandoverItem }>(`/projects/${id}/handover-items`, payload).then((r) => r.data.data),
+  updateHandoverItem: (id: string, itemId: string, payload: Record<string, unknown>) =>
+    api.patch<{ data: HandoverItem }>(`/projects/${id}/handover-items/${itemId}`, payload).then((r) => r.data.data),
+  handoverBrief: (id: string) =>
+    api.get<{ data: HandoverBrief }>(`/projects/${id}/handover-brief`).then((r) => r.data.data),
+  timeline: (id: string) => api.get<Paginated<Activity>>(`/projects/${id}/timeline`).then((r) => r.data.data),
+  tasks: (id: string) => api.get<{ data: Task[] }>(`/projects/${id}/tasks`).then((r) => r.data.data),
+}
+
+/** Referral agent portal. Everything is scoped to the caller server-side. */
+export const portalApi = {
+  summary: () => api.get<{ data: PortalSummary }>('/portal/summary').then((r) => r.data.data),
+  opportunities: (query?: Query) =>
+    api.get<Paginated<PortalOpportunity>>('/portal/opportunities', { params: params(query) }).then((r) => r.data),
+  show: (id: string) =>
+    api
+      .get<{ data: { opportunity: PortalOpportunity; progress: PortalProgressEntry[] } }>(`/portal/opportunities/${id}`)
+      .then((r) => r.data.data),
+}
+
+export const documentApi = {
+  list: (subjectType: string, subjectId: string) =>
+    api
+      .get<{ data: DocumentFile[] }>('/documents', { params: { subject_type: subjectType, subject_id: subjectId } })
+      .then((r) => r.data.data),
+  upload: (form: FormData) =>
+    api.post<{ data: DocumentFile }>('/documents', form).then((r) => r.data.data),
+  remove: (id: string) => api.delete(`/documents/${id}`).then(() => undefined),
+  /** Downloads stream through the API, so the blob is fetched with the auth header. */
+  download: async (doc: DocumentFile) => {
+    const response = await api.get(`/documents/${doc.id}/download`, { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data as Blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = doc.name
+    link.click()
+    URL.revokeObjectURL(url)
+  },
 }
 
 export const taskApi = {

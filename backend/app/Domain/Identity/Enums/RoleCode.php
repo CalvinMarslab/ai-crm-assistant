@@ -26,13 +26,17 @@ enum RoleCode: string
             self::Owner => PermissionCode::cases(),
 
             // Agents see only what they introduced, and never internal material.
+            // Project visibility is high-level status only.
             self::ReferralAgent => [
+                PermissionCode::PortalAccess,
                 PermissionCode::AgentViewOwn,
                 PermissionCode::OpportunityViewOwnReferrals,
                 PermissionCode::OpportunityCreate,
+                PermissionCode::ProjectViewOwnReferrals,
             ],
 
-            // PMs get delivery context; sales visibility is granted per project in Phase 2.
+            // PMs get delivery context for the projects assigned to them, and
+            // the sales history behind those projects — but no wider pipeline.
             self::ProjectManager => [
                 PermissionCode::CompanyViewAll,
                 PermissionCode::ContactViewAll,
@@ -40,6 +44,12 @@ enum RoleCode: string
                 PermissionCode::TaskViewOwn,
                 PermissionCode::TaskManage,
                 PermissionCode::PipelineView,
+                PermissionCode::ProjectViewAssigned,
+                PermissionCode::ProjectUpdate,
+                PermissionCode::ProjectUpdateStatus,
+                PermissionCode::ProjectManageHandover,
+                PermissionCode::DocumentView,
+                PermissionCode::DocumentUpload,
             ],
         };
     }

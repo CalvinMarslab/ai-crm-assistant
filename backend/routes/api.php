@@ -6,9 +6,12 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OpportunityController;
 use App\Http\Controllers\Api\V1\PipelineController;
+use App\Http\Controllers\Api\V1\PortalController;
+use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +55,30 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::get('opportunities/{opportunity}/timeline', [OpportunityController::class, 'timeline']);
         Route::get('opportunities/{opportunity}/stage-history', [OpportunityController::class, 'stageHistory']);
         Route::apiResource('opportunities', OpportunityController::class);
+
+        // Projects and handover (Phase 2).
+        Route::post('opportunities/{opportunity}/convert-to-project', [ProjectController::class, 'convert']);
+        Route::get('projects/{project}/handover-items', [ProjectController::class, 'handoverItems']);
+        Route::post('projects/{project}/handover-items', [ProjectController::class, 'addHandoverItem']);
+        Route::patch('projects/{project}/handover-items/{item}', [ProjectController::class, 'updateHandoverItem']);
+        Route::get('projects/{project}/handover-brief', [ProjectController::class, 'handoverBrief']);
+        Route::get('projects/{project}/timeline', [ProjectController::class, 'timeline']);
+        Route::get('projects/{project}/tasks', [ProjectController::class, 'tasks']);
+        Route::post('projects/{project}/status', [ProjectController::class, 'changeStatus']);
+        Route::post('projects/{project}/manager', [ProjectController::class, 'assignManager']);
+        Route::post('projects/{project}/notes', [ProjectController::class, 'addNote']);
+        Route::apiResource('projects', ProjectController::class)->except(['store']);
+
+        // Referral agent portal (Phase 2). Always scoped to the caller.
+        Route::get('portal/summary', [PortalController::class, 'summary']);
+        Route::get('portal/opportunities', [PortalController::class, 'opportunities']);
+        Route::get('portal/opportunities/{uuid}', [PortalController::class, 'show']);
+
+        // Documents (Phase 2). Downloads stream through the app, never a public path.
+        Route::get('documents', [DocumentController::class, 'index']);
+        Route::post('documents', [DocumentController::class, 'store']);
+        Route::get('documents/{document}/download', [DocumentController::class, 'download']);
+        Route::delete('documents/{document}', [DocumentController::class, 'destroy']);
 
         // Tasks and follow-ups.
         Route::post('tasks/{task}/complete', [TaskController::class, 'complete']);

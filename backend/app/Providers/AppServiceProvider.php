@@ -7,6 +7,7 @@ use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Company\Models\Company;
 use App\Domain\Company\Models\Contact;
 use App\Domain\Opportunity\Models\Opportunity;
+use App\Domain\Project\Models\Project;
 use App\Domain\Task\Models\Task;
 use App\Models\User;
 use App\Support\OrganizationClock;
@@ -15,6 +16,7 @@ use App\Policies\AuditLogPolicy;
 use App\Policies\CompanyPolicy;
 use App\Policies\ContactPolicy;
 use App\Policies\OpportunityPolicy;
+use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -107,6 +109,8 @@ class AppServiceProvider extends ServiceProvider
             'contact' => Contact::class,
             'agent' => Agent::class,
             'task' => Task::class,
+            'project' => Project::class,
+            'document' => \App\Domain\Document\Models\Document::class,
             'user' => User::class,
         ]);
     }
@@ -122,6 +126,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Contact::class, ContactPolicy::class);
         Gate::policy(Agent::class, AgentPolicy::class);
         Gate::policy(Task::class, TaskPolicy::class);
+        Gate::policy(Project::class, ProjectPolicy::class);
+        Gate::policy(\App\Domain\Document\Models\Document::class, \App\Policies\DocumentPolicy::class);
         Gate::policy(AuditLog::class, AuditLogPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
     }

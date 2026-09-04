@@ -15,9 +15,12 @@ import AgentDetailPage from '@/pages/AgentDetailPage'
 import TaskListPage from '@/pages/TaskListPage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import SettingsPage from '@/pages/SettingsPage'
+import ProjectListPage from '@/pages/ProjectListPage'
+import ProjectDetailPage from '@/pages/ProjectDetailPage'
+import PortalPage from '@/pages/PortalPage'
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, can } = useAuth()
 
   if (loading) {
     return <Spinner label="Starting up…" />
@@ -28,6 +31,20 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
+  }
+
+  // A referral agent's whole application is the portal. Routing them here
+  // rather than hiding menu items means an internal URL cannot be typed in.
+  if (can('portal.access') && !can('opportunity.view.all')) {
+    return (
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<PortalPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
     )
   }
@@ -45,6 +62,8 @@ export default function App() {
         <Route path="/contacts" element={<ContactListPage />} />
         <Route path="/agents" element={<AgentListPage />} />
         <Route path="/agents/:id" element={<AgentDetailPage />} />
+        <Route path="/projects" element={<ProjectListPage />} />
+        <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/tasks" element={<TaskListPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />

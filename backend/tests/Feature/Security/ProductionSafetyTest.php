@@ -92,6 +92,20 @@ class ProductionSafetyTest extends TestCase
         app()['env'] = 'testing';
     }
 
+    /**
+     * Browsers hit download URLs directly, without an Accept header, so the
+     * unauthenticated response must still be a clean 401 rather than a 500
+     * from a redirect to a login route that does not exist.
+     */
+    public function test_unauthenticated_api_requests_return_401_even_without_a_json_accept_header(): void
+    {
+        foreach (['/api/v1/dashboard', '/api/v1/documents/does-not-matter/download'] as $url) {
+            $response = $this->get($url, ['Accept' => 'text/html']);
+
+            $this->assertSame(401, $response->status(), "{$url} returned {$response->status()}");
+        }
+    }
+
     public function test_cors_is_not_a_wildcard(): void
     {
         $this->assertNotContains('*', config('cors.allowed_origins'));
