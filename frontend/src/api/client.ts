@@ -9,7 +9,10 @@ export const tokenStore = {
 }
 
 export const api = axios.create({
-  baseURL: '/api/v1',
+  // Unset in development, where Vite proxies /api to the local backend and
+  // keeps the browser on one origin. Set in production to point at the
+  // deployed API, which lives on a different host.
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
   headers: { Accept: 'application/json' },
 })
 

@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Local environment. Vite bakes VITE_* values into the bundle at build time,
+# so nothing secret belongs here — but the file is per-machine, and the
+# example is the one that gets committed.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
