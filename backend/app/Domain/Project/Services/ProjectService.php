@@ -6,6 +6,7 @@ use App\Domain\Activity\Enums\ActivityType;
 use App\Domain\Activity\Services\ActivityRecorder;
 use App\Domain\Notification\Services\Notifier;
 use App\Domain\Opportunity\Models\Opportunity;
+use App\Domain\Project\Enums\HandoverItemStatus;
 use App\Domain\Project\Enums\ProjectStatus;
 use App\Domain\Project\Models\Project;
 use App\Models\User;
@@ -98,11 +99,7 @@ class ProjectService
         return DB::transaction(function () use ($project, $manager, $previous) {
             $project->update(['project_manager_user_id' => $manager?->id]);
 
-            // Unassigned checklist items follow the manager, so a newly assigned
-            // PM inherits the outstanding handover rather than an empty list.
-            $project->handoverItems()->whereNull('assigned_user_id')->update([
-                'assigned_user_id' => $manager?->id,
-            ]);
+            $this->moveOutstandingHandover($project, $previous, $manager);
 
             $this->activities->record(
                 type: ActivityType::ProjectManagerAssigned,
@@ -118,6 +115,39 @@ class ProjectService
 
             return $project->fresh(['manager', 'handoverItems']);
         });
+    }
+
+    /**
+     * The checklist is the incoming manager's work list, so outstanding items
+     * move with the project. Three rules, in the same transaction as the
+     * assignment itself:
+     *
+     *  - Items still sitting with the outgoing manager, or with nobody, go to
+     *    the incoming one. Without this a new manager inherits a project whose
+     *    handover is addressed to somebody who can no longer open it.
+     *  - Items deliberately delegated to a third person stay with them. A
+     *    reassignment is not a reason to undo somebody's arrangements.
+     *  - Settled items keep whoever actually dealt with them. Rewriting those
+     *    would make the record claim work was done by a person who never
+     *    touched it.
+     */
+    private function moveOutstandingHandover(Project $project, ?User $previous, ?User $manager): void
+    {
+        $outstanding = $project->handoverItems()
+            ->whereNotIn('status', [
+                HandoverItemStatus::Done->value,
+                HandoverItemStatus::NotApplicable->value,
+            ]);
+
+        $outstanding
+            ->where(function ($query) use ($previous) {
+                $query->whereNull('assigned_user_id');
+
+                if ($previous !== null) {
+                    $query->orWhere('assigned_user_id', $previous->id);
+                }
+            })
+            ->update(['assigned_user_id' => $manager?->id]);
     }
 
     public function changeStatus(Project $project, ProjectStatus $status, ?string $note = null): Project

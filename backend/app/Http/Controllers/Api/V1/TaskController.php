@@ -9,6 +9,7 @@ use App\Domain\Opportunity\Models\Opportunity;
 use App\Domain\Task\Models\Task;
 use App\Domain\Task\Services\TaskService;
 use App\Domain\Task\Services\TaskSubjectResolver;
+use App\Domain\Task\Services\TaskVisibility;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
@@ -24,6 +25,7 @@ class TaskController extends Controller
     public function __construct(
         private readonly TaskService $tasks,
         private readonly TaskSubjectResolver $subjects,
+        private readonly TaskVisibility $visibility,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -110,11 +112,7 @@ class TaskController extends Controller
 
     private function visibleQuery(User $user): Builder
     {
-        return $user->canDo(PermissionCode::TaskViewAll)
-            ? Task::query()
-            : Task::query()->where(fn (Builder $q) => $q
-                ->where('assigned_user_id', $user->id)
-                ->orWhere('created_by_user_id', $user->id));
+        return $this->visibility->scope(Task::query(), $user);
     }
 
     /**

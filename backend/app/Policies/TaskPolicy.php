@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Domain\Identity\Enums\PermissionCode;
 use App\Domain\Task\Models\Task;
+use App\Domain\Task\Services\TaskVisibility;
 use App\Models\User;
 
 class TaskPolicy
@@ -13,14 +14,17 @@ class TaskPolicy
         return $user->canDoAny([PermissionCode::TaskViewAll, PermissionCode::TaskViewOwn]);
     }
 
+    public function __construct(private readonly TaskVisibility $visibility) {}
+
+    /**
+     * Delegated so the per-record decision and the listing query cannot drift
+     * apart. A task attached to a record follows that record's access, which
+     * is what stops a former project manager working tasks through their
+     * created_by trail after the project moves on.
+     */
     public function view(User $user, Task $task): bool
     {
-        if ($user->canDo(PermissionCode::TaskViewAll)) {
-            return true;
-        }
-
-        return $user->canDo(PermissionCode::TaskViewOwn)
-            && in_array($user->id, [$task->assigned_user_id, $task->created_by_user_id], true);
+        return $this->visibility->decide($user, $task);
     }
 
     public function create(User $user): bool
