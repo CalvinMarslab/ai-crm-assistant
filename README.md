@@ -1,4 +1,4 @@
-# AI CRM Assistant — Phases 1–2
+# AI CRM Assistant — Phases 1–3
 
 An AI-assisted CRM and business execution system.
 
@@ -10,8 +10,12 @@ agents: convert to project, assign a PM, work a handover checklist, track
 project status and tasks, attach documents, and give agents a portal showing
 their own referrals in simplified language.
 
-Built to `DEVELOPMENT_PHASES.md`. The AI assistant, Telegram, email, calendar
-and SaaS billing belong to later phases and are not built here.
+**Phase 3** adds the assistant: a chat that answers from your own records, a
+daily brief calculated from them, and Telegram delivery. Writes are proposals
+the user confirms; nothing is saved on the model's say-so.
+
+Built to `DEVELOPMENT_PHASES.md`. Email, calendar, WhatsApp and SaaS billing
+belong to later phases and are not built here.
 
 ## Stack
 
@@ -71,10 +75,15 @@ mysql -u root -e "CREATE DATABASE ai_crm_testing CHARACTER SET utf8mb4 COLLATE u
 cd backend && php artisan test
 ```
 
-121 feature tests: the `ACCEPTANCE_TEST.md` criteria, the end-to-end lead
-lifecycle, tenant and role isolation, opportunity state rules, timezone handling,
-production-safety checks, project handover, the agent portal, and document
-storage security.
+181 feature tests: the `ACCEPTANCE_TEST.md` criteria, the end-to-end lead
+lifecycle, tenant and role isolation, opportunity state rules, timezone
+handling, production-safety checks, project handover, the agent portal,
+document storage security, and the assistant's guardrails — that a write never
+happens without confirmation, that a tool the user cannot run is refused even
+if the model asks for it, and that the brief works with no model at all.
+
+The assistant tests script a fake provider, so what is under test is this
+side's behaviour rather than a live model's mood.
 
 The suite freezes the clock (`Tests\TestCase::NOW`) because much of this domain
 is time-relative; without that, results depend on what time of day the suite runs.
@@ -188,6 +197,9 @@ policy-gated. Entities are addressed by UUID.
 | ” reads | `GET /{uuid}/timeline` · `/tasks` |
 | **Documents** | `GET|POST /documents` · `GET /documents/{uuid}/download` · `DELETE /documents/{uuid}` |
 | **Agent portal** | `GET /portal/summary` · `/portal/opportunities` · `/portal/opportunities/{uuid}` |
+| **Assistant** | `GET /ai/status` · `/ai/daily-brief` · `GET|POST /ai/conversations` · `GET|POST /ai/conversations/{uuid}/messages` |
+| ” confirmations | `GET /ai/action-requests` · `POST /ai/action-requests/{uuid}/confirm` · `/reject` |
+| **Telegram** | `GET /integrations/telegram` · `POST|DELETE /integrations/telegram/link` · `POST /test-brief` |
 
 Opportunity list filters answer the execution questions directly:
 `without_next_action`, `follow_up_due`, `awaiting_quotation_response`,
@@ -211,7 +223,9 @@ Task filters: `overdue`, `due_today`, `upcoming`, `unassigned`, `open`,
 | `/tasks` | Grouped Overdue / Due today / Upcoming / No due date |
 | `/notifications` | In-app notification centre with unread badge |
 | `/projects`, `/projects/:id` | Handover checklist, tasks, documents, timeline, and the sales history behind the project |
-| `/settings` | Users & roles, pipeline stages, audit log |
+| `/brief` | The daily brief: what to start with, then the sections behind it |
+| `/assistant` | Chat, with proposed changes shown as confirmation cards |
+| `/settings` | Users & roles, pipeline stages, Telegram, audit log |
 
 A referral agent signs in to a portal instead of the CRM: their own referrals in
 simplified language, their performance, and a progress trail. It is a separate
@@ -301,11 +315,42 @@ record it hangs off. Uploads are an extension allow-list.
 `CRM_WORKFLOW.md` §6 requires the PM to receive "relevant documents", and
 PRD §14 says "copy documents" — so they are built here as part of handover.
 
+## Phase 3 notes
+
+**The brief is arithmetic, not prose.** Every number in the daily brief is
+counted from your records; no model is consulted. That is why it works before
+any API key is configured, and why it cannot invent an overdue task. The
+"suggested" section is derived from those same facts by fixed rules and is
+labelled separately, because a suggestion is not a record.
+
+**The model cannot write.** It names a tool; this side decides what that means.
+Read tools run immediately. Write tools produce a pending `ai_action_request`
+and nothing else — the user confirms, and only then does the change run through
+the same domain service and policies a human goes through, landing in the
+timeline and the audit log identically. Permission is re-checked at confirmation
+rather than trusted from when the assistant proposed it.
+
+**Tools are filtered before the model sees them.** A tool the user cannot run is
+never described to it, so the assistant does not offer work it will be refused.
+A project manager is offered seven of the twelve; a referral agent has no
+assistant at all, because their portal is deliberately narrow and an assistant
+would be a way around it.
+
+**Provider-agnostic.** `LlmProvider` is the seam; the OpenAI-compatible adapter
+is the first implementation and points at any endpoint speaking that dialect.
+With no key configured the assistant reports itself unavailable rather than
+degrading into guesswork.
+
+**Telegram is outbound only.** The system sends; it accepts no commands, has no
+webhook, and can only reach a chat the user linked themselves. Linking sends a
+test message immediately and is discarded if that fails, so a half-linked
+account cannot silently swallow every brief. The scheduler runs hourly and
+delivers to each organization at its own local hour.
+
 ## What is not included yet
 
-Per `DEVELOPMENT_PHASES.md`: the AI assistant and Telegram (Phase 3); email,
-calendar and WhatsApp (Phase 4); SaaS onboarding and billing (Phase 5).
+Per `DEVELOPMENT_PHASES.md`: email, calendar and WhatsApp (Phase 4); tenant
+onboarding, configurable pipelines and billing (Phase 5).
 
-The seams exist — the `Notifier` entry point, organization scoping, and domain
-services with typed inputs the Phase 3 tool layer can call — but no speculative
-code was written for them.
+Telegram's later scope — accepting `/today` and free-text commands — is
+deliberately absent. Phase 3 is notifications only.

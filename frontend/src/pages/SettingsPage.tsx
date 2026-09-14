@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { auditApi, pipelineApi, userApi } from '@/api/endpoints'
+import { auditApi, pipelineApi, telegramApi, userApi } from '@/api/endpoints'
 import { errorMessage, validationErrors } from '@/api/client'
 import { PageHeader } from '@/components/PageHeader'
 import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Spinner, cx } from '@/components/ui'
@@ -8,7 +8,7 @@ import { Modal, ModalFooter } from '@/components/Modal'
 import { dateTime, titleCase } from '@/lib/format'
 import { useAuth } from '@/hooks/useAuth'
 
-type Tab = 'users' | 'pipeline' | 'audit'
+type Tab = 'users' | 'pipeline' | 'telegram' | 'audit'
 
 export default function SettingsPage() {
   const { can } = useAuth()
@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const tabs: { key: Tab; label: string; visible: boolean }[] = [
     { key: 'users', label: 'Users & roles', visible: can('user.view.all') },
     { key: 'pipeline', label: 'Pipeline', visible: true },
+    { key: 'telegram', label: 'Telegram', visible: can('integration.telegram.link') },
     { key: 'audit', label: 'Audit log', visible: can('audit.view') },
   ]
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
         <div className="p-4">
           {tab === 'users' && <UsersPanel />}
           {tab === 'pipeline' && <PipelinePanel />}
+          {tab === 'telegram' && <TelegramPanel />}
           {tab === 'audit' && <AuditPanel />}
         </div>
       </Card>
@@ -176,6 +178,100 @@ function UserFormModal({ open, onClose }: { open: boolean; onClose: () => void }
         </Field>
       </div>
     </Modal>
+  )
+}
+
+/**
+ * Linking Telegram. The chat id comes from the user's own conversation with
+ * the bot, so a notification can only ever go to a chat they opened
+ * themselves.
+ */
+function TelegramPanel() {
+  const queryClient = useQueryClient()
+  const [chatId, setChatId] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const { data: status, isLoading } = useQuery({ queryKey: ['telegram', 'status'], queryFn: telegramApi.status })
+
+  function invalidate() {
+    void queryClient.invalidateQueries({ queryKey: ['telegram', 'status'] })
+  }
+
+  const link = useMutation({
+    mutationFn: () => telegramApi.link(chatId.trim()),
+    onSuccess: () => {
+      setChatId('')
+      setErrors({})
+      invalidate()
+    },
+    onError: (error) => setErrors(validationErrors(error)),
+  })
+
+  const unlink = useMutation({ mutationFn: telegramApi.unlink, onSuccess: invalidate })
+  const test = useMutation({ mutationFn: telegramApi.sendTestBrief })
+
+  if (isLoading) return <Spinner />
+
+  if (!status?.configured) {
+    return (
+      <div className="max-w-prose">
+        <p className="text-sm font-medium text-slate-900">Telegram is not set up on this server.</p>
+        <p className="mt-1 text-sm text-slate-600">
+          Create a bot with @BotFather and set <code className="rounded bg-slate-100 px-1">TELEGRAM_BOT_TOKEN</code> in
+          the backend environment.
+        </p>
+      </div>
+    )
+  }
+
+  if (status.linked) {
+    return (
+      <div className="max-w-prose">
+        <p className="flex items-center gap-2 text-sm font-medium text-slate-900">
+          Connected
+          <Badge tone="green">Active</Badge>
+        </p>
+        <p className="mt-1 text-sm text-slate-600">
+          {status.username ? `@${status.username} · ` : ''}
+          Linked {status.linked_at ? dateTime(status.linked_at) : ''}. Your brief arrives each morning.
+        </p>
+        <div className="mt-4 flex gap-2">
+          <Button variant="secondary" onClick={() => test.mutate()} disabled={test.isPending}>
+            {test.isPending ? 'Sending…' : 'Send me one now'}
+          </Button>
+          <Button variant="ghost" onClick={() => unlink.mutate()} disabled={unlink.isPending}>
+            Disconnect
+          </Button>
+        </div>
+        {test.isSuccess && <p className="mt-2 text-xs text-emerald-700">Sent. Check Telegram.</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-prose">
+      <p className="text-sm font-medium text-slate-900">Get your daily brief on Telegram</p>
+      <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-600">
+        <li>Open Telegram and send your company bot any message.</li>
+        <li>Send <code className="rounded bg-slate-100 px-1">/start</code> to @userinfobot to get your chat ID.</li>
+        <li>Paste that number below.</li>
+      </ol>
+
+      <div className="mt-4 flex max-w-sm items-end gap-2">
+        <div className="flex-1">
+          <Field label="Chat ID" error={errors.chat_id}>
+            <Input value={chatId} onChange={(event) => setChatId(event.target.value)} placeholder="123456789" />
+          </Field>
+        </div>
+        <Button onClick={() => link.mutate()} disabled={chatId.trim() === '' || link.isPending}>
+          {link.isPending ? 'Checking…' : 'Connect'}
+        </Button>
+      </div>
+
+      <p className="mt-2 text-xs text-slate-500">
+        We send a test message straight away. If it does not arrive, the link is not saved.
+      </p>
+    </div>
   )
 }
 

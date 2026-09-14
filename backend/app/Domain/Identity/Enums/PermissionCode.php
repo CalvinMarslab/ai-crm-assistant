@@ -66,6 +66,13 @@ enum PermissionCode: string
     // Agent portal (Phase 2)
     case PortalAccess = 'portal.access';
 
+    // AI assistant (Phase 3)
+    case AiUse = 'ai.use';
+    case AiExecuteWrites = 'ai.write.execute';
+
+    // Integrations (Phase 3)
+    case IntegrationTelegramLink = 'integration.telegram.link';
+
     // Dashboard, audit, notifications
     case DashboardViewOwner = 'dashboard.view.owner';
     case AuditView = 'audit.view';

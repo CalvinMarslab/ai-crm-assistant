@@ -346,3 +346,106 @@ export interface DocumentFile {
   subject: { type: string }
   created_at: string
 }
+
+// ---- Phase 3: assistant, brief, Telegram ----
+
+export interface AiStatus {
+  /** Chat needs a model; the brief does not. */
+  chat_available: boolean
+  brief_available: boolean
+  can_execute_writes: boolean
+}
+
+export interface AiConversationSummary {
+  id: string
+  title: string
+  last_message_at: string | null
+}
+
+export interface AiMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string | null
+  tools_used: string[]
+  created_at: string
+}
+
+export type ActionRequestStatus = 'pending' | 'executed' | 'rejected' | 'failed' | 'expired'
+
+export interface AiActionRequest {
+  id: string
+  action: string
+  summary: string | null
+  payload: Record<string, unknown>
+  status: ActionRequestStatus
+  status_label: string
+  is_actionable: boolean
+  has_expired: boolean
+  expires_at: string | null
+  executed_at: string | null
+  result: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface BriefPriority {
+  why: string
+  what: string
+  detail: string | null
+  reference: string
+  type: 'task' | 'opportunity'
+}
+
+export interface BriefTask {
+  reference: string
+  title: string
+  due_at: string | null
+  overdue_by: string | null
+  assignee: string | null
+  attached_to: string | null
+}
+
+export interface BriefOpportunity {
+  reference: string
+  title: string
+  company: string | null
+  stage: string | null
+  owner: string | null
+  estimated_value: number | null
+  next_action: string | null
+  next_follow_up_at: string | null
+  last_contact_at: string | null
+}
+
+export interface BriefProject {
+  reference: string
+  name: string
+  company: string | null
+  status: string
+  manager: string | null
+  reason: string
+}
+
+export interface DailyBrief {
+  generated_at: string
+  for: string
+  timezone: string
+  top_priorities: BriefPriority[]
+  sections: {
+    overdue_tasks: BriefTask[]
+    tasks_due_today: BriefTask[]
+    follow_ups_due: BriefOpportunity[]
+    opportunities_without_next_action: BriefOpportunity[]
+    proposals_awaiting_response: BriefOpportunity[]
+    high_value_at_risk: BriefOpportunity[]
+    projects_requiring_update: BriefProject[]
+  }
+  suggested_actions: string[]
+  counts: Record<string, number>
+}
+
+export interface TelegramStatus {
+  configured: boolean
+  linked: boolean
+  username: string | null
+  linked_at: string | null
+}

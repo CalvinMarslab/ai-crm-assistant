@@ -18,6 +18,8 @@ import SettingsPage from '@/pages/SettingsPage'
 import ProjectListPage from '@/pages/ProjectListPage'
 import ProjectDetailPage from '@/pages/ProjectDetailPage'
 import PortalPage from '@/pages/PortalPage'
+import AssistantPage from '@/pages/AssistantPage'
+import BriefPage from '@/pages/BriefPage'
 
 export default function App() {
   const { user, loading, can } = useAuth()
@@ -54,6 +56,8 @@ export default function App() {
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/brief" element={<BriefPage />} />
+        <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/pipeline" element={<OpportunityBoardPage />} />
         <Route path="/opportunities" element={<OpportunityListPage />} />
         <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AgentController;
 use App\Http\Controllers\Api\V1\AuditLogController;
+use App\Http\Controllers\Api\V1\AssistantController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyController;
 use App\Http\Controllers\Api\V1\ContactController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\V1\PipelineController;
 use App\Http\Controllers\Api\V1\PortalController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\TaskController;
+use App\Http\Controllers\Api\V1\TelegramController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -79,6 +81,25 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('documents', [DocumentController::class, 'store']);
         Route::get('documents/{document}/download', [DocumentController::class, 'download']);
         Route::delete('documents/{document}', [DocumentController::class, 'destroy']);
+
+        // AI assistant (Phase 3). Writes are proposals until confirmed.
+        Route::get('ai/status', [AssistantController::class, 'status']);
+        Route::get('ai/daily-brief', [AssistantController::class, 'dailyBrief']);
+        Route::get('ai/conversations', [AssistantController::class, 'conversations']);
+        Route::post('ai/conversations', [AssistantController::class, 'startConversation']);
+        Route::get('ai/conversations/{uuid}/messages', [AssistantController::class, 'messages']);
+        Route::post('ai/conversations/{uuid}/messages', [AssistantController::class, 'send'])
+            ->middleware('throttle:ai');
+        Route::delete('ai/conversations/{uuid}', [AssistantController::class, 'deleteConversation']);
+        Route::get('ai/action-requests', [AssistantController::class, 'actionRequests']);
+        Route::post('ai/action-requests/{uuid}/confirm', [AssistantController::class, 'confirmAction']);
+        Route::post('ai/action-requests/{uuid}/reject', [AssistantController::class, 'rejectAction']);
+
+        // Telegram, outbound only in this phase.
+        Route::get('integrations/telegram', [TelegramController::class, 'status']);
+        Route::post('integrations/telegram/link', [TelegramController::class, 'link']);
+        Route::delete('integrations/telegram/link', [TelegramController::class, 'unlink']);
+        Route::post('integrations/telegram/test-brief', [TelegramController::class, 'sendTestBrief']);
 
         // Tasks and follow-ups.
         Route::post('tasks/{task}/complete', [TaskController::class, 'complete']);

@@ -54,6 +54,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
             ->by($request->user()?->id ?: $request->ip()));
 
+        // Each assistant turn can fan out into several model calls, so it is
+        // limited well below the general API allowance.
+        RateLimiter::for('ai', fn (Request $request) => Limit::perMinute(15)
+            ->by($request->user()?->id ?: $request->ip()));
+
         RateLimiter::for('login', fn (Request $request) => [
             Limit::perMinute(5)->by($request->ip()),
             Limit::perMinute(5)->by(strtolower((string) $request->input('email')).'|'.$request->ip()),
@@ -111,6 +116,7 @@ class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'project' => Project::class,
             'document' => \App\Domain\Document\Models\Document::class,
+            'ai_action_request' => \App\Domain\Ai\Models\AiActionRequest::class,
             'user' => User::class,
         ]);
     }

@@ -50,6 +50,9 @@ enum RoleCode: string
                 PermissionCode::ProjectManageHandover,
                 PermissionCode::DocumentView,
                 PermissionCode::DocumentUpload,
+                PermissionCode::AiUse,
+                PermissionCode::AiExecuteWrites,
+                PermissionCode::IntegrationTelegramLink,
             ],
         };
     }

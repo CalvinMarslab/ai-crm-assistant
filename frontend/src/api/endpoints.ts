@@ -1,9 +1,10 @@
 import { api } from './client'
 import type {
   Activity, Agent, AgentStats, AppNotification, AuditLogEntry, Company, Contact,
+  AiActionRequest, AiConversationSummary, AiMessage, AiStatus, DailyBrief,
   Dashboard, DocumentFile, HandoverBrief, HandoverItem, LeadSource, Opportunity, Paginated,
   PortalOpportunity, PortalProgressEntry, PortalSummary, Pipeline, Project, Role,
-  StageHistoryEntry, Task, User,
+  StageHistoryEntry, Task, TelegramStatus, User,
 } from '@/types'
 
 type Query = Record<string, string | number | boolean | undefined | null>
@@ -138,6 +139,43 @@ export const documentApi = {
     link.click()
     URL.revokeObjectURL(url)
   },
+}
+
+export const aiApi = {
+  status: () => api.get<{ data: AiStatus }>('/ai/status').then((r) => r.data.data),
+  dailyBrief: () => api.get<{ data: DailyBrief }>('/ai/daily-brief').then((r) => r.data.data),
+  conversations: () => api.get<{ data: AiConversationSummary[] }>('/ai/conversations').then((r) => r.data.data),
+  startConversation: () =>
+    api.post<{ data: { id: string } }>('/ai/conversations').then((r) => r.data.data),
+  deleteConversation: (id: string) => api.delete(`/ai/conversations/${id}`).then(() => undefined),
+  messages: (id: string) =>
+    api.get<{ data: AiMessage[] }>(`/ai/conversations/${id}/messages`).then((r) => r.data.data),
+  send: (id: string, message: string) =>
+    api
+      .post<{ data: { message: AiMessage; action_requests: AiActionRequest[] } }>(
+        `/ai/conversations/${id}/messages`,
+        { message },
+      )
+      .then((r) => r.data.data),
+  actionRequests: (pendingOnly = false) =>
+    api
+      .get<{ data: AiActionRequest[] }>('/ai/action-requests', { params: params({ pending: pendingOnly }) })
+      .then((r) => r.data.data),
+  confirmAction: (id: string) =>
+    api.post<{ data: AiActionRequest }>(`/ai/action-requests/${id}/confirm`).then((r) => r.data.data),
+  rejectAction: (id: string) =>
+    api.post<{ data: AiActionRequest }>(`/ai/action-requests/${id}/reject`).then((r) => r.data.data),
+}
+
+export const telegramApi = {
+  status: () => api.get<{ data: TelegramStatus }>('/integrations/telegram').then((r) => r.data.data),
+  link: (chatId: string, username?: string) =>
+    api
+      .post<{ data: { linked: boolean } }>('/integrations/telegram/link', { chat_id: chatId, username })
+      .then((r) => r.data.data),
+  unlink: () => api.delete('/integrations/telegram/link').then(() => undefined),
+  sendTestBrief: () =>
+    api.post<{ data: { delivered: boolean } }>('/integrations/telegram/test-brief').then((r) => r.data.data),
 }
 
 export const taskApi = {
