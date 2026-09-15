@@ -273,6 +273,11 @@ class DashboardService
     {
         $query = Task::query();
 
+        // Same staff-only boundary the task list applies.
+        if (! $user->canDo(PermissionCode::TaskViewInternal)) {
+            $query->where('is_internal', false);
+        }
+
         return $user->canDo(PermissionCode::TaskViewAll)
             ? $query
             : $query->where('assigned_user_id', $user->id);

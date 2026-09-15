@@ -40,6 +40,7 @@ enum PermissionCode: string
     // Tasks
     case TaskViewAll = 'task.view.all';
     case TaskViewOwn = 'task.view.own';
+    case TaskViewInternal = 'task.view.internal';
     case TaskManage = 'task.manage';
 
     // Users & roles

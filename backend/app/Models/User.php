@@ -40,6 +40,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'telegram_linked_at' => 'datetime',
             'password' => 'hashed',
         ];
     }

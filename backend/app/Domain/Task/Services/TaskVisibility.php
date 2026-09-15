@@ -39,6 +39,12 @@ class TaskVisibility
      */
     public function decide(User $user, Task $task): bool
     {
+        // Staff-only work is withheld first, before any other consideration:
+        // being assigned a task does not make an internal one visible.
+        if ($task->is_internal && ! $user->canDo(PermissionCode::TaskViewInternal)) {
+            return false;
+        }
+
         if ($user->canDo(PermissionCode::TaskViewAll)) {
             return true;
         }
@@ -73,6 +79,10 @@ class TaskVisibility
      */
     public function scope(Builder $query, User $user): Builder
     {
+        if (! $user->canDo(PermissionCode::TaskViewInternal)) {
+            $query->where('is_internal', false);
+        }
+
         if ($user->canDo(PermissionCode::TaskViewAll)) {
             return $query;
         }

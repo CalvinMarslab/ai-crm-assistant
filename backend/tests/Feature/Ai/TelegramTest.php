@@ -45,6 +45,30 @@ class TelegramTest extends TestCase
             && $request['chat_id'] === '123456789');
     }
 
+    /**
+     * The gap that let a string timestamp reach the status endpoint: linking
+     * was tested, and reading the status afterwards was not.
+     */
+    public function test_status_is_readable_immediately_after_linking(): void
+    {
+        $this->telegramSucceeds();
+        $owner = $this->owner();
+
+        $this->actingAs($owner)
+            ->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '7338853431', 'username' => 'someone'])
+            ->assertOk();
+
+        $this->actingAs($owner)
+            ->getJson('/api/v1/integrations/telegram')
+            ->assertOk()
+            ->assertJsonPath('data.linked', true)
+            ->assertJsonPath('data.username', 'someone');
+
+        $this->assertNotNull(
+            $this->actingAs($owner)->getJson('/api/v1/integrations/telegram')->json('data.linked_at'),
+        );
+    }
+
     public function test_a_link_that_cannot_be_reached_is_not_kept(): void
     {
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'chat not found'], 400)]);

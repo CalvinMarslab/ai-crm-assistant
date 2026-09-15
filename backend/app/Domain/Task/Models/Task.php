@@ -32,7 +32,16 @@ class Task extends Model
 
     protected array $auditable = ['assigned_user_id', 'status', 'due_at', 'priority'];
 
-    /** Mirrors the column defaults so a newly created model is never null here. */
+    /**
+     * is_internal marks a task as staff-only: it is withheld from referral
+     * agents and from anyone else without task.view.internal. It is not a
+     * private-to-me flag — colleagues who can see the record still see it.
+     *
+     * Defaults to true because internal work is the normal case; a task meant
+     * to be visible to an agent has to say so.
+     *
+     * Mirrors the column defaults so a newly created model is never null here.
+     */
     protected $attributes = [
         'priority' => 'normal',
         'status' => 'to_do',

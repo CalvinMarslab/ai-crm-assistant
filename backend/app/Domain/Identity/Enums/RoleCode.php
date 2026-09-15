@@ -42,6 +42,7 @@ enum RoleCode: string
                 PermissionCode::ContactViewAll,
                 PermissionCode::OpportunityViewOwn,
                 PermissionCode::TaskViewOwn,
+                PermissionCode::TaskViewInternal,
                 PermissionCode::TaskManage,
                 PermissionCode::PipelineView,
                 PermissionCode::ProjectViewAssigned,

@@ -75,7 +75,7 @@ mysql -u root -e "CREATE DATABASE ai_crm_testing CHARACTER SET utf8mb4 COLLATE u
 cd backend && php artisan test
 ```
 
-181 feature tests: the `ACCEPTANCE_TEST.md` criteria, the end-to-end lead
+190 feature tests: the `ACCEPTANCE_TEST.md` criteria, the end-to-end lead
 lifecycle, tenant and role isolation, opportunity state rules, timezone
 handling, production-safety checks, project handover, the agent portal,
 document storage security, and the assistant's guardrails — that a write never
@@ -346,6 +346,27 @@ webhook, and can only reach a chat the user linked themselves. Linking sends a
 test message immediately and is discarded if that fails, so a half-linked
 account cannot silently swallow every brief. The scheduler runs hourly and
 delivers to each organization at its own local hour.
+
+## Two decisions worth knowing
+
+**An owner can be assigned as project manager.** The check is on the
+permission, not the role name, and an owner holds every permission code. This
+is intentional: in a small business the owner often runs delivery, and the
+granular design means an organisation that later wants sales and delivery
+strictly separated can express that with its own role rather than a code
+change. Nothing about a project behaves differently when the owner holds it.
+
+**`tasks.is_internal` means staff-only, not private-to-me.** An internal task
+is withheld from anyone without `task.view.internal`; colleagues who hold it
+still see the task. It defaults to true because internal work is the normal
+case, so a task meant to be visible outside the team has to say so.
+
+The three seeded roles all sit on one side of that line — owners and project
+managers hold the permission, referral agents do not — and a referral agent has
+no task permission at all today, so the boundary is currently belt to the
+portal's braces. It is enforced rather than assumed because
+`USER_ROLES_PERMISSION.md` states it, and because a flag that looks like a
+control but filters nothing is worse than no flag.
 
 ## What is not included yet
 
