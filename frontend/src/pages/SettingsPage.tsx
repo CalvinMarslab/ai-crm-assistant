@@ -182,32 +182,36 @@ function UserFormModal({ open, onClose }: { open: boolean; onClose: () => void }
 }
 
 /**
- * Linking Telegram. The chat id comes from the user's own conversation with
- * the bot, so a notification can only ever go to a chat they opened
- * themselves.
+ * Linking Telegram via expiring link token. The user clicks "Generate link",
+ * opens the deep link in Telegram, and sends /start — the webhook verifies
+ * the token and establishes the link.
  */
 function TelegramPanel() {
   const queryClient = useQueryClient()
-  const [chatId, setChatId] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [deepLink, setDeepLink] = useState<{ url: string; expires_at: string } | null>(null)
 
-  const { data: status, isLoading } = useQuery({ queryKey: ['telegram', 'status'], queryFn: telegramApi.status })
+  const { data: status, isLoading } = useQuery({
+    queryKey: ['telegram', 'status'],
+    queryFn: telegramApi.status,
+    refetchInterval: deepLink ? 3000 : false,
+  })
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ['telegram', 'status'] })
   }
 
-  const link = useMutation({
-    mutationFn: () => telegramApi.link(chatId.trim()),
-    onSuccess: () => {
-      setChatId('')
-      setErrors({})
-      invalidate()
-    },
-    onError: (error) => setErrors(validationErrors(error)),
+  const requestLink = useMutation({
+    mutationFn: telegramApi.requestLinkToken,
+    onSuccess: (data) => setDeepLink({ url: data.deep_link, expires_at: data.expires_at }),
   })
 
-  const unlink = useMutation({ mutationFn: telegramApi.unlink, onSuccess: invalidate })
+  const unlink = useMutation({
+    mutationFn: telegramApi.unlink,
+    onSuccess: () => {
+      setDeepLink(null)
+      invalidate()
+    },
+  })
   const test = useMutation({ mutationFn: telegramApi.sendTestBrief })
 
   if (isLoading) return <Spinner />
@@ -217,8 +221,8 @@ function TelegramPanel() {
       <div className="max-w-prose">
         <p className="text-sm font-medium text-slate-900">Telegram is not set up on this server.</p>
         <p className="mt-1 text-sm text-slate-600">
-          Create a bot with @BotFather and set <code className="rounded bg-slate-100 px-1">TELEGRAM_BOT_TOKEN</code> in
-          the backend environment.
+          Create a bot with @BotFather and set <code className="rounded bg-slate-100 px-1">TELEGRAM_BOT_TOKEN</code> and{' '}
+          <code className="rounded bg-slate-100 px-1">TELEGRAM_BOT_USERNAME</code> in the backend environment.
         </p>
       </div>
     )
@@ -252,25 +256,32 @@ function TelegramPanel() {
     <div className="max-w-prose">
       <p className="text-sm font-medium text-slate-900">Get your daily brief on Telegram</p>
       <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-600">
-        <li>Open Telegram and send your company bot any message.</li>
-        <li>Send <code className="rounded bg-slate-100 px-1">/start</code> to @userinfobot to get your chat ID.</li>
-        <li>Paste that number below.</li>
+        <li>Click the button below to generate a secure link.</li>
+        <li>Open the link in Telegram — it will take you to the bot.</li>
+        <li>Press Start in Telegram to complete the connection.</li>
       </ol>
 
-      <div className="mt-4 flex max-w-sm items-end gap-2">
-        <div className="flex-1">
-          <Field label="Chat ID" error={errors.chat_id}>
-            <Input value={chatId} onChange={(event) => setChatId(event.target.value)} placeholder="123456789" />
-          </Field>
+      {deepLink ? (
+        <div className="mt-4">
+          <a
+            href={deepLink.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Open in Telegram
+          </a>
+          <p className="mt-2 text-xs text-slate-500">
+            This link expires at {dateTime(deepLink.expires_at)}. Waiting for you to press Start in Telegram…
+          </p>
         </div>
-        <Button onClick={() => link.mutate()} disabled={chatId.trim() === '' || link.isPending}>
-          {link.isPending ? 'Checking…' : 'Connect'}
-        </Button>
-      </div>
-
-      <p className="mt-2 text-xs text-slate-500">
-        We send a test message straight away. If it does not arrive, the link is not saved.
-      </p>
+      ) : (
+        <div className="mt-4">
+          <Button onClick={() => requestLink.mutate()} disabled={requestLink.isPending}>
+            {requestLink.isPending ? 'Generating…' : 'Generate link'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

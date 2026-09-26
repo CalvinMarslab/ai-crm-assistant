@@ -31,6 +31,9 @@ class AiServiceProvider extends ServiceProvider
 
         // Write: only ever proposed for confirmation.
         Tools\CreateTaskTool::class,
+        Tools\CompleteTaskTool::class,
+        Tools\CreateOpportunityTool::class,
+        Tools\IngestLeadTool::class,
         Tools\UpdateOpportunityNextActionTool::class,
         Tools\UpdateOpportunityStageTool::class,
         Tools\AddNoteTool::class,

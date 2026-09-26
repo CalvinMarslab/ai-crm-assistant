@@ -6,8 +6,10 @@ use App\Domain\Ai\Contracts\LlmProvider;
 use App\Domain\Ai\Data\LlmMessage;
 use App\Domain\Ai\Data\ToolDefinition;
 use App\Domain\Ai\Exceptions\AssistantUnavailable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Speaks the OpenAI chat-completions dialect, which most hosted and
@@ -56,10 +58,25 @@ class OpenAiCompatibleProvider implements LlmProvider
             $payload['tool_choice'] = 'auto';
         }
 
-        $response = Http::withToken($this->apiKey)
-            ->timeout($this->timeout)
-            ->acceptJson()
-            ->post(rtrim($this->baseUrl, '/').'/chat/completions', $payload);
+        try {
+            $response = Http::withToken($this->apiKey)
+                ->timeout($this->timeout)
+                ->acceptJson()
+                ->post(rtrim($this->baseUrl, '/').'/chat/completions', $payload);
+        } catch (ConnectionException $exception) {
+            // Connection/timeout — never leak the URL or body.
+            Log::warning('LLM connection failed', ['model' => $this->model]);
+
+            throw AssistantUnavailable::providerError(503);
+        } catch (Throwable $exception) {
+            // Catch-all for unexpected HTTP client errors.
+            Log::warning('LLM request exception', [
+                'model' => $this->model,
+                'error_class' => get_class($exception),
+            ]);
+
+            throw AssistantUnavailable::providerError(503);
+        }
 
         if ($response->failed()) {
             // The body can carry the customer question back verbatim, so it is
@@ -72,7 +89,15 @@ class OpenAiCompatibleProvider implements LlmProvider
             throw AssistantUnavailable::providerError($response->status());
         }
 
-        return $this->decodeMessage($response->json('choices.0.message') ?? []);
+        $message = $response->json('choices.0.message');
+
+        if (! is_array($message)) {
+            Log::warning('LLM returned malformed response', ['model' => $this->model]);
+
+            throw AssistantUnavailable::providerError(502);
+        }
+
+        return $this->decodeMessage($message);
     }
 
     /**

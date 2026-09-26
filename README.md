@@ -341,11 +341,15 @@ is the first implementation and points at any endpoint speaking that dialect.
 With no key configured the assistant reports itself unavailable rather than
 degrading into guesswork.
 
-**Telegram is outbound only.** The system sends; it accepts no commands, has no
-webhook, and can only reach a chat the user linked themselves. Linking sends a
-test message immediately and is discarded if that fails, so a half-linked
-account cannot silently swallow every brief. The scheduler runs hourly and
-delivers to each organization at its own local hour.
+**Telegram is two-way and confirmation-gated.** A linked user may ask the same
+permission-scoped questions as the web assistant. Read answers return directly;
+writes such as creating or completing a task and creating or updating an
+opportunity are only proposals until the same Telegram user presses Confirm.
+The scheduler runs hourly and delivers to each organization at its local hour.
+
+**Hermes Agent can propose signed updates.** The HMAC-authenticated integration
+reuses the same permission-filtered write tools and confirmation service. See
+`docs/HERMES_INTEGRATION.md` for the request contract.
 
 ## Two decisions worth knowing
 
@@ -372,6 +376,3 @@ control but filters nothing is worse than no flag.
 
 Per `DEVELOPMENT_PHASES.md`: email, calendar and WhatsApp (Phase 4); tenant
 onboarding, configurable pipelines and billing (Phase 5).
-
-Telegram's later scope — accepting `/today` and free-text commands — is
-deliberately absent. Phase 3 is notifications only.

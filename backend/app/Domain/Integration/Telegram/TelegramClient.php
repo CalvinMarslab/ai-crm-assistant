@@ -20,21 +20,27 @@ class TelegramClient
         return $this->botToken !== '';
     }
 
-    public function sendMessage(string $chatId, string $text): bool
+    /** @param array<string, mixed>|null $replyMarkup */
+    public function sendMessage(string $chatId, string $text, ?array $replyMarkup = null): bool
     {
         if (! $this->isConfigured()) {
             return false;
         }
 
+        $payload = [
+            'chat_id' => $chatId,
+            'text' => mb_substr($text, 0, 4096),
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ];
+
+        if ($replyMarkup !== null) {
+            $payload['reply_markup'] = $replyMarkup;
+        }
+
         $response = Http::timeout($this->timeout)
             ->asJson()
-            ->post("https://api.telegram.org/bot{$this->botToken}/sendMessage", [
-                'chat_id' => $chatId,
-                'text' => $text,
-                'parse_mode' => 'HTML',
-                // The brief links back into the CRM; previews would be noise.
-                'disable_web_page_preview' => true,
-            ]);
+            ->post("https://api.telegram.org/bot{$this->botToken}/sendMessage", $payload);
 
         if ($response->failed()) {
             // Never logged with the message body: a brief names customers.
@@ -47,5 +53,18 @@ class TelegramClient
         }
 
         return true;
+    }
+
+    public function answerCallbackQuery(string $callbackQueryId, string $text): bool
+    {
+        if (! $this->isConfigured()) {
+            return false;
+        }
+
+        return Http::timeout($this->timeout)->asJson()
+            ->post("https://api.telegram.org/bot{$this->botToken}/answerCallbackQuery", [
+                'callback_query_id' => $callbackQueryId,
+                'text' => mb_substr($text, 0, 200),
+            ])->successful();
     }
 }

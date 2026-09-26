@@ -10,7 +10,7 @@ class AiMessage extends Model
 {
     use HasUuid;
 
-    protected $fillable = ['conversation_id', 'role', 'content', 'tool_calls', 'tool_results'];
+    protected $fillable = ['conversation_id', 'role', 'content', 'tool_calls', 'tool_results', 'idempotency_key', 'turn_id'];
 
     protected function casts(): array
     {

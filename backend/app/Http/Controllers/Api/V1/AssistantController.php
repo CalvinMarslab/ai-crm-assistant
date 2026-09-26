@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Ai\Exceptions\AssistantUnavailable;
 use App\Domain\Ai\Models\AiActionRequest;
 use App\Domain\Ai\Models\AiConversation;
 use App\Domain\Ai\Services\ActionRequestService;
@@ -14,6 +15,7 @@ use App\Http\Resources\AiMessageResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\ValidationException;
 
 class AssistantController extends Controller
 {
@@ -86,9 +88,31 @@ class AssistantController extends Controller
 
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:4000'],
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $outcome = $this->assistant->reply($request->user(), $conversation, $validated['message']);
+        $headerKey = $request->header('Idempotency-Key');
+        if ($headerKey !== null && strlen($headerKey) > 64) {
+            throw ValidationException::withMessages([
+                'idempotency_key' => 'The idempotency key must not exceed 64 characters.',
+            ]);
+        }
+
+        $idempotencyKey = $validated['idempotency_key'] ?? $headerKey;
+
+        try {
+            $outcome = $this->assistant->reply(
+                $request->user(),
+                $conversation,
+                $validated['message'],
+                $idempotencyKey,
+            );
+        } catch (AssistantUnavailable) {
+            // Sanitized 503 — never leaks provider details.
+            return response()->json([
+                'message' => 'The AI assistant is temporarily unavailable. Please try again.',
+            ], 503);
+        }
 
         return response()->json([
             'data' => [

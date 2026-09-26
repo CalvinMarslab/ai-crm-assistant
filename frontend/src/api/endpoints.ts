@@ -150,11 +150,11 @@ export const aiApi = {
   deleteConversation: (id: string) => api.delete(`/ai/conversations/${id}`).then(() => undefined),
   messages: (id: string) =>
     api.get<{ data: AiMessage[] }>(`/ai/conversations/${id}/messages`).then((r) => r.data.data),
-  send: (id: string, message: string) =>
+  send: (id: string, message: string, idempotencyKey?: string) =>
     api
       .post<{ data: { message: AiMessage; action_requests: AiActionRequest[] } }>(
         `/ai/conversations/${id}/messages`,
-        { message },
+        { message, idempotency_key: idempotencyKey },
       )
       .then((r) => r.data.data),
   actionRequests: (pendingOnly = false) =>
@@ -169,9 +169,9 @@ export const aiApi = {
 
 export const telegramApi = {
   status: () => api.get<{ data: TelegramStatus }>('/integrations/telegram').then((r) => r.data.data),
-  link: (chatId: string, username?: string) =>
+  requestLinkToken: () =>
     api
-      .post<{ data: { linked: boolean } }>('/integrations/telegram/link', { chat_id: chatId, username })
+      .post<{ data: { deep_link: string; expires_at: string } }>('/integrations/telegram/link-token')
       .then((r) => r.data.data),
   unlink: () => api.delete('/integrations/telegram/link').then(() => undefined),
   sendTestBrief: () =>

@@ -38,11 +38,11 @@ export default function AssistantPage() {
   })
 
   const send = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({ message, idempotencyKey }: { message: string; idempotencyKey: string }) => {
       const id = conversationId ?? (await aiApi.startConversation()).id
       setConversationId(id)
 
-      return aiApi.send(id, message)
+      return aiApi.send(id, message, idempotencyKey)
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ai', 'messages'] })
@@ -63,7 +63,7 @@ export default function AssistantPage() {
     if (message === '' || send.isPending) return
 
     setDraft('')
-    send.mutate(message)
+    send.mutate({ message, idempotencyKey: crypto.randomUUID().replace(/-/g, '') })
   }
 
   const pendingActions = actionRequests.filter((request: AiActionRequest) => request.status === 'pending')
@@ -127,7 +127,9 @@ export default function AssistantPage() {
                 {STARTERS.map((starter) => (
                   <button
                     key={starter}
-                    onClick={() => send.mutate(starter)}
+                    onClick={() =>
+                      send.mutate({ message: starter, idempotencyKey: crypto.randomUUID().replace(/-/g, '') })
+                    }
                     className="rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-200"
                   >
                     {starter}

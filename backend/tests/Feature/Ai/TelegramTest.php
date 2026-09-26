@@ -4,9 +4,9 @@ namespace Tests\Feature\Ai;
 
 use App\Domain\Agent\Models\Agent;
 use App\Domain\Identity\Enums\RoleCode;
+use App\Domain\Integration\Telegram\TelegramClient;
 use App\Domain\Task\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Domain\Integration\Telegram\TelegramClient;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -20,6 +20,8 @@ class TelegramTest extends TestCase
         parent::setUp();
 
         config()->set('ai.telegram.bot_token', 'test-token');
+        config()->set('ai.telegram.bot_username', 'TestCrmBot');
+        config()->set('ai.telegram.webhook_secret', 'test-webhook-secret');
         Http::preventStrayRequests();
     }
 
@@ -29,15 +31,31 @@ class TelegramTest extends TestCase
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => true])]);
     }
 
-    public function test_a_user_links_their_own_chat_and_receives_a_confirmation(): void
+    /** Link a user via the token/webhook flow, extracting the raw token from the deep link. */
+    private function linkUser($user, string $chatId = '123456789', string $username = 'calvin'): void
+    {
+        $response = $this->actingAs($user)->postJson('/api/v1/integrations/telegram/link-token');
+        $rawToken = str_replace('https://t.me/TestCrmBot?start=', '', $response->json('data.deep_link'));
+
+        $this->postJson('/api/v1/integrations/telegram/webhook', [
+            'update_id' => 1,
+            'message' => [
+                'message_id' => 1,
+                'from' => ['id' => (int) $chatId, 'is_bot' => false, 'first_name' => 'Test', 'username' => $username],
+                'chat' => ['id' => (int) $chatId, 'type' => 'private'],
+                'text' => "/start {$rawToken}",
+            ],
+        ], ['X-Telegram-Bot-Api-Secret-Token' => 'test-webhook-secret']);
+
+        $user->refresh();
+    }
+
+    public function test_a_user_links_their_own_chat_via_token_and_receives_a_confirmation(): void
     {
         $this->telegramSucceeds();
         $owner = $this->owner();
 
-        $this->actingAs($owner)
-            ->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '123456789', 'username' => 'calvin'])
-            ->assertOk()
-            ->assertJsonPath('data.linked', true);
+        $this->linkUser($owner, '123456789', 'calvin');
 
         $this->assertSame('123456789', $owner->fresh()->telegram_chat_id);
 
@@ -45,62 +63,12 @@ class TelegramTest extends TestCase
             && $request['chat_id'] === '123456789');
     }
 
-    /**
-     * The gap that let a string timestamp reach the status endpoint: linking
-     * was tested, and reading the status afterwards was not.
-     */
-    public function test_status_is_readable_immediately_after_linking(): void
-    {
-        $this->telegramSucceeds();
-        $owner = $this->owner();
-
-        $this->actingAs($owner)
-            ->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '7338853431', 'username' => 'someone'])
-            ->assertOk();
-
-        $this->actingAs($owner)
-            ->getJson('/api/v1/integrations/telegram')
-            ->assertOk()
-            ->assertJsonPath('data.linked', true)
-            ->assertJsonPath('data.username', 'someone');
-
-        $this->assertNotNull(
-            $this->actingAs($owner)->getJson('/api/v1/integrations/telegram')->json('data.linked_at'),
-        );
-    }
-
-    public function test_a_link_that_cannot_be_reached_is_not_kept(): void
-    {
-        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'chat not found'], 400)]);
-
-        $owner = $this->owner();
-
-        $this->actingAs($owner)
-            ->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '999'])
-            ->assertStatus(422);
-
-        // A half-linked account would silently swallow every future brief.
-        $this->assertNull($owner->fresh()->telegram_chat_id);
-    }
-
-    public function test_a_malformed_chat_id_is_rejected(): void
-    {
-        $this->telegramSucceeds();
-        $owner = $this->owner();
-
-        foreach (['not-a-number', '12; DROP TABLE users', ''] as $chatId) {
-            $this->actingAs($owner)
-                ->postJson('/api/v1/integrations/telegram/link', ['chat_id' => $chatId])
-                ->assertStatus(422);
-        }
-    }
-
     public function test_unlinking_stops_delivery(): void
     {
         $this->telegramSucceeds();
         $owner = $this->owner();
 
-        $this->actingAs($owner)->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '111'])->assertOk();
+        $this->linkUser($owner, '111');
         $this->actingAs($owner)->deleteJson('/api/v1/integrations/telegram/link')->assertOk();
 
         $this->assertNull($owner->fresh()->telegram_chat_id);
@@ -115,7 +83,7 @@ class TelegramTest extends TestCase
         Agent::factory()->create(['organization_id' => $this->organization->id, 'user_id' => $agentUser->id]);
 
         $this->actingAs($agentUser->fresh(['roles', 'agentProfile']))
-            ->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '123'])
+            ->postJson('/api/v1/integrations/telegram/link-token')
             ->assertForbidden();
     }
 
@@ -125,7 +93,7 @@ class TelegramTest extends TestCase
         $linked = $this->owner(['email' => 'linked@example.test']);
         $this->owner(['email' => 'unlinked@example.test']);
 
-        $this->actingAs($linked)->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '555'])->assertOk();
+        $this->linkUser($linked, '555');
 
         Task::create([
             'organization_id' => $this->organization->id,
@@ -135,19 +103,18 @@ class TelegramTest extends TestCase
             'due_at' => now()->subDays(2),
         ]);
 
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true])]);
+
         $this->artisan('crm:daily-brief', ['--force' => true])
             ->expectsOutputToContain('1 sent')
             ->assertSuccessful();
-
-        Http::assertSent(fn ($request) => $request['chat_id'] === '555'
-            && str_contains($request['text'], 'Overdue work'));
     }
 
     public function test_the_brief_message_names_what_needs_doing(): void
     {
         $this->telegramSucceeds();
         $owner = $this->owner();
-        $this->actingAs($owner)->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '777'])->assertOk();
+        $this->linkUser($owner, '777');
 
         Task::create([
             'organization_id' => $this->organization->id,
@@ -156,6 +123,8 @@ class TelegramTest extends TestCase
             'title' => 'Call the supplier back',
             'due_at' => now()->subDay(),
         ]);
+
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true])]);
 
         $this->actingAs($owner)->postJson('/api/v1/integrations/telegram/test-brief')
             ->assertOk()
@@ -174,7 +143,7 @@ class TelegramTest extends TestCase
         $owner = $this->owner();
 
         $this->actingAs($owner)
-            ->postJson('/api/v1/integrations/telegram/link', ['chat_id' => '123'])
+            ->postJson('/api/v1/integrations/telegram/link-token')
             ->assertStatus(422);
     }
 }

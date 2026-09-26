@@ -18,7 +18,15 @@ return [
 
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
+        // The @username of the bot created with @BotFather, without the @.
+        'bot_username' => env('TELEGRAM_BOT_USERNAME', ''),
+        // Set via Telegram's setWebhook API; verified on every inbound update.
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET', ''),
         // Hour of the day, in each organization's own timezone, for the brief.
         'daily_brief_hour' => (int) env('TELEGRAM_DAILY_BRIEF_HOUR', 9),
+    ],
+
+    'hermes' => [
+        'webhook_secret' => env('HERMES_WEBHOOK_SECRET', ''),
     ],
 ];

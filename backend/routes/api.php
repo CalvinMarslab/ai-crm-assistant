@@ -1,13 +1,14 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AgentController;
-use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AssistantController;
+use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompanyController;
 use App\Http\Controllers\Api\V1\ContactController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DocumentController;
+use App\Http\Controllers\Api\V1\HermesWebhookController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OpportunityController;
 use App\Http\Controllers\Api\V1\PipelineController;
@@ -19,6 +20,12 @@ use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    // Telegram webhook — authenticated by secret header, not Sanctum.
+    Route::post('integrations/telegram/webhook', [TelegramController::class, 'webhook']);
+    Route::post('integrations/hermes/actions', [HermesWebhookController::class, 'propose']);
+    Route::post('integrations/hermes/actions/{uuid}/confirm', [HermesWebhookController::class, 'confirm']);
+    Route::post('integrations/hermes/actions/{uuid}/reject', [HermesWebhookController::class, 'reject']);
+
     // Deliberately tighter than the rest of the API: this is the one unauthenticated
     // write endpoint, so it is the one worth brute-forcing.
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -95,9 +102,9 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('ai/action-requests/{uuid}/confirm', [AssistantController::class, 'confirmAction']);
         Route::post('ai/action-requests/{uuid}/reject', [AssistantController::class, 'rejectAction']);
 
-        // Telegram, outbound only in this phase.
+        // Telegram linking via expiring token + inbound webhook.
         Route::get('integrations/telegram', [TelegramController::class, 'status']);
-        Route::post('integrations/telegram/link', [TelegramController::class, 'link']);
+        Route::post('integrations/telegram/link-token', [TelegramController::class, 'requestLinkToken']);
         Route::delete('integrations/telegram/link', [TelegramController::class, 'unlink']);
         Route::post('integrations/telegram/test-brief', [TelegramController::class, 'sendTestBrief']);
 

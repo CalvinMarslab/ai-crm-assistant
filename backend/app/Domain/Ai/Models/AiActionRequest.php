@@ -25,9 +25,9 @@ class AiActionRequest extends Model
     use HasUuid;
 
     protected $fillable = [
-        'organization_id', 'user_id', 'conversation_id', 'action_name', 'action_payload',
-        'summary', 'status', 'confirmation_required', 'confirmed_at', 'executed_at',
-        'expires_at', 'execution_result',
+        'organization_id', 'user_id', 'conversation_id', 'turn_id', 'source', 'external_id', 'action_name',
+        'action_payload', 'summary', 'status', 'confirmation_required', 'confirmed_at',
+        'executed_at', 'expires_at', 'execution_result',
     ];
 
     protected array $auditable = ['status', 'confirmed_at', 'executed_at'];

@@ -448,4 +448,5 @@ export interface TelegramStatus {
   linked: boolean
   username: string | null
   linked_at: string | null
+  bot_username: string | null
 }

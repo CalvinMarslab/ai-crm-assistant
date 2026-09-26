@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Ai\Services\DailyBriefService;
 use App\Domain\Identity\Enums\PermissionCode;
-use App\Domain\Integration\Telegram\TelegramBriefFormatter;
-use App\Domain\Integration\Telegram\TelegramChannel;
+use App\Domain\Integration\Telegram\DailyBriefDelivery;
+use App\Domain\Integration\Telegram\Jobs\SendDailyBriefToUser;
 use App\Domain\Organization\Models\Organization;
 use App\Models\User;
 use App\Support\OrganizationClock;
@@ -15,9 +14,10 @@ use Illuminate\Console\Command;
 /**
  * The 9am Telegram brief from TELEGRAM_INTEGRATION.md.
  *
- * Runs hourly and sends to the organizations whose local time has just reached
- * the configured hour, so every tenant gets it at nine in their own morning
- * rather than nine in the server's.
+ * Runs hourly and queues individual jobs for organizations whose local time
+ * has just reached the configured hour. Each recipient gets an isolated,
+ * retryable job; the delivery ledger ensures scheduler reruns never duplicate
+ * a delivered brief.
  */
 class SendDailyBrief extends Command
 {
@@ -28,12 +28,8 @@ class SendDailyBrief extends Command
 
     protected $description = 'Send the daily brief to users who have linked Telegram';
 
-    public function handle(
-        DailyBriefService $brief,
-        TelegramChannel $channel,
-        TelegramBriefFormatter $formatter,
-        OrganizationClock $clock,
-    ): int {
+    public function handle(OrganizationClock $clock): int
+    {
         $targetHour = (int) config('ai.telegram.daily_brief_hour');
         $sent = 0;
         $skipped = 0;
@@ -49,7 +45,9 @@ class SendDailyBrief extends Command
             OrganizationContext::set($organization->id);
             $clock->reset();
 
-            $localHour = (int) $clock->now()->format('G');
+            $localNow = $clock->now();
+            $localHour = (int) $localNow->format('G');
+            $localDate = $localNow->toDateString();
 
             if (! $this->option('force') && $localHour !== $targetHour) {
                 continue;
@@ -66,11 +64,13 @@ class SendDailyBrief extends Command
                     continue;
                 }
 
-                // A message that says nothing needs doing is still worth
-                // sending once; a silent morning is ambiguous.
-                $payload = $brief->for($user);
+                // Check the delivery ledger: skip terminal and in-flight states.
+                // delivered, sending, and uncertain are never re-attempted.
+                $existing = DailyBriefDelivery::where('user_id', $user->id)
+                    ->where('delivery_date', $localDate)
+                    ->first();
 
-                if (! $channel->canReach($user)) {
+                if ($existing !== null && $existing->isTerminal()) {
                     $skipped++;
 
                     continue;
@@ -83,9 +83,19 @@ class SendDailyBrief extends Command
                     continue;
                 }
 
-                $channel->send($user, 'Your daily brief', $formatter->format($payload))
-                    ? $sent++
-                    : $skipped++;
+                // Record a queued entry in the ledger.
+                DailyBriefDelivery::updateOrCreate(
+                    ['user_id' => $user->id, 'delivery_date' => $localDate],
+                    ['organization_id' => $organization->id, 'status' => 'queued'],
+                );
+
+                SendDailyBriefToUser::dispatch(
+                    $user->id,
+                    $organization->id,
+                    $localDate,
+                );
+
+                $sent++;
             }
         }
 
