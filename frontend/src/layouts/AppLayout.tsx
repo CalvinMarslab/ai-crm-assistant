@@ -28,6 +28,7 @@ const navigation: NavItem[] = [
   { to: '/opportunities', label: 'Opportunities', icon: '◈' },
   { to: '/projects', label: 'Projects', icon: '▣', permission: 'project.view.assigned' },
   { to: '/tasks', label: 'Tasks', icon: '✓', permission: 'task.view.own' },
+  { to: '/services', label: 'Services & renewals', icon: '↻', permission: 'service.view' },
   { to: '/companies', label: 'Companies', icon: '⌂', permission: 'company.view.all' },
   { to: '/contacts', label: 'Contacts', icon: '☺', permission: 'contact.view.all' },
   { to: '/agents', label: 'Agents', icon: '⇄' },

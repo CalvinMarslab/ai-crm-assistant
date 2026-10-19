@@ -9,6 +9,8 @@ namespace App\Domain\Identity\Enums;
  */
 enum PermissionCode: string
 {
+    case ServiceView = 'service.view';
+    case ServiceManage = 'service.manage';
     // Companies & contacts
     case CompanyViewAll = 'company.view.all';
     case CompanyManage = 'company.manage';

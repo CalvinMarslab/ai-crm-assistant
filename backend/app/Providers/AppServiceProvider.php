@@ -3,26 +3,32 @@
 namespace App\Providers;
 
 use App\Domain\Agent\Models\Agent;
+use App\Domain\Ai\Models\AiActionRequest;
 use App\Domain\Audit\Models\AuditLog;
 use App\Domain\Company\Models\Company;
 use App\Domain\Company\Models\Contact;
+use App\Domain\Document\Models\Document;
 use App\Domain\Opportunity\Models\Opportunity;
 use App\Domain\Project\Models\Project;
+use App\Domain\Service\Models\ServicePayment;
+use App\Domain\Service\Models\ServiceSubscription;
 use App\Domain\Task\Models\Task;
 use App\Models\User;
-use App\Support\OrganizationClock;
 use App\Policies\AgentPolicy;
 use App\Policies\AuditLogPolicy;
 use App\Policies\CompanyPolicy;
 use App\Policies\ContactPolicy;
+use App\Policies\DocumentPolicy;
 use App\Policies\OpportunityPolicy;
 use App\Policies\ProjectPolicy;
+use App\Policies\ServiceSubscriptionPolicy;
 use App\Policies\TaskPolicy;
 use App\Policies\UserPolicy;
+use App\Support\OrganizationClock;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -109,14 +115,16 @@ class AppServiceProvider extends ServiceProvider
     private function registerMorphMap(): void
     {
         Relation::enforceMorphMap([
+            'service_subscription' => ServiceSubscription::class,
+            'service_payment' => ServicePayment::class,
             'opportunity' => Opportunity::class,
             'company' => Company::class,
             'contact' => Contact::class,
             'agent' => Agent::class,
             'task' => Task::class,
             'project' => Project::class,
-            'document' => \App\Domain\Document\Models\Document::class,
-            'ai_action_request' => \App\Domain\Ai\Models\AiActionRequest::class,
+            'document' => Document::class,
+            'ai_action_request' => AiActionRequest::class,
             'user' => User::class,
         ]);
     }
@@ -127,13 +135,14 @@ class AppServiceProvider extends ServiceProvider
      */
     private function registerPolicies(): void
     {
+        Gate::policy(ServiceSubscription::class, ServiceSubscriptionPolicy::class);
         Gate::policy(Opportunity::class, OpportunityPolicy::class);
         Gate::policy(Company::class, CompanyPolicy::class);
         Gate::policy(Contact::class, ContactPolicy::class);
         Gate::policy(Agent::class, AgentPolicy::class);
         Gate::policy(Task::class, TaskPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
-        Gate::policy(\App\Domain\Document\Models\Document::class, \App\Policies\DocumentPolicy::class);
+        Gate::policy(Document::class, DocumentPolicy::class);
         Gate::policy(AuditLog::class, AuditLogPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
     }

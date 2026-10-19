@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\OpportunityController;
 use App\Http\Controllers\Api\V1\PipelineController;
 use App\Http\Controllers\Api\V1\PortalController;
 use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\ServiceSubscriptionController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TelegramController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -35,6 +36,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
 
         // Dashboard — the execution view.
+        Route::get('services/summary', [ServiceSubscriptionController::class, 'summary']);
+        Route::post('services/{service}/renew', [ServiceSubscriptionController::class, 'renew']);
+        Route::post('services/{service}/deliveries/{delivery}/retry', [ServiceSubscriptionController::class, 'retry']);
+        Route::apiResource('services', ServiceSubscriptionController::class)->except(['destroy']);
+
         Route::get('dashboard', [DashboardController::class, 'index']);
         Route::get('dashboard/metrics', [DashboardController::class, 'metrics']);
 
