@@ -2,7 +2,6 @@
 
 namespace App\Domain\Service\Services;
 
-use App\Domain\Identity\Enums\PermissionCode;
 use App\Domain\Notification\Services\Notifier;
 use App\Domain\Service\Models\RenewalDelivery;
 use App\Domain\Service\Models\ServiceSubscription;
@@ -20,7 +19,7 @@ class RenewalReminderService
         DB::transaction(function () use ($subscription) {
             $service = ServiceSubscription::whereKey($subscription->id)->lockForUpdate()->firstOrFail();
             $service->load(['company', 'owner']);
-            if ($service->status !== 'active' || ! $service->hasRenewalTerms() || ! $service->company || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->canDo(PermissionCode::ServiceManage) || $service->expires_on->toDateString() > $this->clock->now()->addDays(15)->toDateString()) {
+            if ($service->status !== 'active' || ! $service->hasRenewalTerms() || ! $service->company || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->can('update', $service) || $service->expires_on->toDateString() > $this->clock->now()->addDays(15)->toDateString()) {
                 return;
             }
             if (! $service->collection_task_id) {

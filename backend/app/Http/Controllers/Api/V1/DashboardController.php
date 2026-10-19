@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Dashboard\Services\DashboardService;
+use App\Domain\Opportunity\Models\Opportunity;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ActivityResource;
 use App\Http\Resources\OpportunityResource;
@@ -20,6 +21,7 @@ class DashboardController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Opportunity::class);
         $user = $request->user();
         $data = $this->dashboard->forUser($user);
 
@@ -45,6 +47,8 @@ class DashboardController extends Controller
 
     public function metrics(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Opportunity::class);
+
         return response()->json([
             'data' => [
                 'metrics' => $this->dashboard->metrics($request->user()),

@@ -3,11 +3,13 @@
 namespace App\Domain\Service\Models;
 
 use App\Domain\Company\Models\Company;
+use App\Domain\Identity\Enums\PermissionCode;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Concerns\HasUuid;
 use App\Models\User;
 use App\Support\Auditable;
 use App\Support\OrganizationClock;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +52,17 @@ class ServiceSubscription extends Model
     public function missingRenewalDetails(): array
     {
         return array_values(array_filter(['customer_email', 'amount', 'currency', 'renewal_months'], fn (string $field): bool => $this->{$field} === null || $this->{$field} === ''));
+    }
+
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->canDo(PermissionCode::ServiceView)) {
+            return $query;
+        }
+
+        return $user->canDo(PermissionCode::ServiceViewServer)
+            ? $query->where('type', 'server')
+            : $query->whereRaw('1 = 0');
     }
 
     public function hasRenewalTerms(): bool

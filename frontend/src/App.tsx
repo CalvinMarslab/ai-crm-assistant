@@ -52,6 +52,18 @@ export default function App() {
     )
   }
 
+  if (can('service.view.server') && !can('service.view') && !can('pipeline.view') && !can('portal.access')) {
+    return (
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/services" element={<ServicesPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="*" element={<Navigate to="/services" replace />} />
+        </Route>
+      </Routes>
+    )
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />

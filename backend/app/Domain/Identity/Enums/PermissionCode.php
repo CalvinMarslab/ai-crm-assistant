@@ -3,7 +3,7 @@
 namespace App\Domain\Identity\Enums;
 
 /**
- * Granular permission codes. The UI exposes three roles, but authorization is
+ * Granular permission codes. The UI exposes system roles, but authorization is
  * always decided on codes (USER_ROLES_PERMISSION.md, "Permission Design
  * Requirement") so new roles do not require touching policies.
  */
@@ -11,6 +11,8 @@ enum PermissionCode: string
 {
     case ServiceView = 'service.view';
     case ServiceManage = 'service.manage';
+    case ServiceViewServer = 'service.view.server';
+    case ServiceManageServer = 'service.manage.server';
     // Companies & contacts
     case CompanyViewAll = 'company.view.all';
     case CompanyManage = 'company.manage';
