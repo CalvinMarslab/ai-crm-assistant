@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Service;
 
+use App\Domain\Identity\Enums\PermissionCode;
 use App\Domain\Service\Models\ServiceSubscription;
 use App\Support\OrganizationContext;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,7 +23,7 @@ class SaveServiceSubscriptionRequest extends FormRequest
             'company_id' => ['required', 'uuid', Rule::exists('companies', 'uuid')->where('organization_id', OrganizationContext::id())->whereNull('deleted_at')],
             'cycle_id' => [$this->route('service') ? 'required' : 'prohibited', 'uuid'],
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', Rule::in(['maintenance', 'server'])],
+            'type' => ['required', Rule::in($this->user()->canDo(PermissionCode::ServiceManage) ? ['maintenance', 'server'] : ['server'])],
             'customer_email' => ['nullable', 'email', 'max:255'],
             'internal_email' => ['required', 'email', 'max:255'],
             'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99', 'decimal:0,2'],

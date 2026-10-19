@@ -52,6 +52,8 @@ export interface RenewalSummary {
 }
 
 export const serviceApi = {
+  companies: (search: string) =>
+    api.get<Paginated<{ id: string; name: string }>>('/services/companies', { params: { search } }).then((r) => r.data),
   list: (params: Record<string, string | number>) =>
     api
       .get<Paginated<ServiceSubscription>>('/services', { params })

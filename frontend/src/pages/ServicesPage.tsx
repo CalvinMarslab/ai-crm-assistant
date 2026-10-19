@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { serviceApi, type ServiceSubscription } from '@/api/services'
-import { companyApi } from '@/api/endpoints'
 import { errorMessage, validationErrors } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
 import { PageHeader } from '@/components/PageHeader'
@@ -33,6 +32,8 @@ const detailLabels: Record<string, string> = {
 
 export default function ServicesPage() {
   const { can } = useAuth()
+  const canView = can('service.view') || can('service.view.server')
+  const canManage = can('service.manage') || can('service.manage.server')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -43,24 +44,24 @@ export default function ServicesPage() {
   const list = useQuery({
     queryKey: ['services', search, status, page],
     queryFn: () => serviceApi.list({ search, status, page }),
-    enabled: can('service.view'),
+    enabled: canView,
   })
   const summary = useQuery({
     queryKey: ['renewal-summary'],
     queryFn: serviceApi.summary,
-    enabled: can('service.view'),
+    enabled: canView,
   })
 
-  if (!can('service.view'))
+  if (!canView)
     return <ErrorState message="You do not have permission to view services." />
 
   return (
     <>
       <PageHeader
-        title="Services & renewals"
-        subtitle="Maintenance and server renewals · Email reminders 15 days before expiry"
+        title={can('service.view') ? 'Services & renewals' : 'Server & hosting'}
+        subtitle="Renewals and payment tracking · Email reminders 15 days before expiry"
         action={
-          can('service.manage') && (
+          canManage && (
             <Button onClick={() => setEditing('new')}>+ New service</Button>
           )
         }
@@ -212,7 +213,7 @@ export default function ServicesPage() {
                       >
                         View / collect
                       </Button>
-                      {can('service.manage') && (
+                      {(can('service.manage') || (service.type === 'server' && can('service.manage.server'))) && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -276,16 +277,17 @@ function ServiceForm({
   defaultEmail: string
   onClose: () => void
 }) {
+  const { can } = useAuth()
   const cache = useQueryClient()
   const [companySearch, setCompanySearch] = useState('')
   const companies = useQuery({
-    queryKey: ['companies', 'service-picker', companySearch],
-    queryFn: () => companyApi.list({ search: companySearch, per_page: 50 }),
+    queryKey: ['service-companies', companySearch],
+    queryFn: () => serviceApi.companies(companySearch),
   })
   const [form, setForm] = useState({
     name: service?.name ?? '',
     company_id: service?.company?.id ?? '',
-    type: service?.type ?? 'maintenance',
+    type: service?.type ?? (can('service.manage') ? 'maintenance' : 'server'),
     customer_email: service?.customer_email ?? '',
     internal_email: service?.internal_email ?? defaultEmail,
     amount: service?.amount ?? '',
@@ -378,8 +380,8 @@ function ServiceForm({
         </div>
         <Field label="Service type" error={errors.type}>
           <Select {...field('type')}>
-            <option value="maintenance">Maintenance</option>
-            <option value="server">Server</option>
+            {can('service.manage') && <option value="maintenance">Maintenance</option>}
+            <option value="server">Server / Hosting</option>
           </Select>
         </Field>
         <Field label="Status" error={errors.status}>
@@ -505,12 +507,12 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
         s && (
           <div className="space-y-5">
             <div>
-              <Link
+              {can('company.view.all') ? <Link
                 className="text-brand-700 underline"
                 to={`/companies/${s.company?.id}`}
               >
                 {s.company?.name ?? 'Company unavailable'}
-              </Link>
+              </Link> : <p className="font-medium">{s.company?.name ?? 'Company unavailable'}</p>}
               <p className="mt-2 text-sm">
                 {s.type} · Expires {s.expires_on} ·{' '}
                 {amount(s.amount, s.currency)} · {s.renewal_months ? `Every ${s.renewal_months} month(s)` : 'Renewal period needed'}
@@ -526,7 +528,7 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 {s.notes}
               </p>
             )}
-            {can('service.manage') &&
+            {(can('service.manage') || (s.type === 'server' && can('service.manage.server'))) &&
               s.can_record_payment &&
               (!paying ? (
                 <Button onClick={() => setPaying(true)}>
@@ -623,7 +625,7 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
                         {d.error ? ` · ${d.error}` : ''}
                       </p>
                     </div>
-                    {can('service.manage') &&
+                    {(can('service.manage') || (s.type === 'server' && can('service.manage.server'))) &&
                       s.status === 'active' &&
                       (d.audience !== 'customer' || s.customer_reminder_ready) &&
                       d.cycle_id === s.cycle_id &&

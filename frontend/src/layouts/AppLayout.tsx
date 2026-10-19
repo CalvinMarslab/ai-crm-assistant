@@ -47,12 +47,15 @@ export function AppLayout() {
   })
 
   const isPortalOnly = can('portal.access') && !can('opportunity.view.all')
+  const isHostingOnly = can('service.view.server') && !can('service.view') && !can('pipeline.view') && !can('portal.access')
+  const hostingNavigation: NavItem[] = [{ to: '/services', label: 'Server & hosting', icon: '↻' }]
 
-  const visible = (isPortalOnly ? portalNavigation : navigation).filter((item) => {
+  const visible = (isPortalOnly ? portalNavigation : isHostingOnly ? hostingNavigation : navigation).filter((item) => {
     if (!item.permission) return true
     // Task visibility is granted by either of two codes.
     if (item.permission === 'task.view.own') return can('task.view.own') || can('task.view.all')
     if (item.permission === 'project.view.assigned') return can('project.view.assigned') || can('project.view.all')
+    if (item.permission === 'service.view') return can('service.view') || can('service.view.server')
     return can(item.permission)
   })
 

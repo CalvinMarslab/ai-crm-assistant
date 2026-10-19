@@ -37,6 +37,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
         // Dashboard — the execution view.
         Route::get('services/summary', [ServiceSubscriptionController::class, 'summary']);
+        Route::get('services/companies', [ServiceSubscriptionController::class, 'companies']);
         Route::post('services/{service}/renew', [ServiceSubscriptionController::class, 'renew']);
         Route::post('services/{service}/deliveries/{delivery}/retry', [ServiceSubscriptionController::class, 'retry']);
         Route::apiResource('services', ServiceSubscriptionController::class)->except(['destroy']);

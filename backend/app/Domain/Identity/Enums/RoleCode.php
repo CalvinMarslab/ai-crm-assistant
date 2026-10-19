@@ -7,6 +7,7 @@ enum RoleCode: string
     case Owner = 'owner';
     case ReferralAgent = 'referral_agent';
     case ProjectManager = 'project_manager';
+    case ServerHostingManager = 'server_hosting_manager';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum RoleCode: string
             self::Owner => 'Owner / Admin',
             self::ReferralAgent => 'Referral Agent',
             self::ProjectManager => 'Project Manager',
+            self::ServerHostingManager => 'Server & Hosting Manager',
         };
     }
 
@@ -24,6 +26,11 @@ enum RoleCode: string
     {
         return match ($this) {
             self::Owner => PermissionCode::cases(),
+
+            self::ServerHostingManager => [
+                PermissionCode::ServiceViewServer,
+                PermissionCode::ServiceManageServer,
+            ],
 
             // Agents see only what they introduced, and never internal material.
             // Project visibility is high-level status only.

@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Identity\Enums\PermissionCode;
 use App\Domain\Opportunity\Models\LeadSource;
 use App\Domain\Pipeline\Models\Pipeline;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PipelineController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        abort_unless($request->user()->canDoAny([PermissionCode::PipelineView, PermissionCode::OpportunityCreate]), 403);
         $pipelines = Pipeline::with('stages')->get()->map(fn (Pipeline $pipeline) => [
             'id' => $pipeline->id,
             'name' => $pipeline->name,
@@ -30,8 +33,9 @@ class PipelineController extends Controller
         return response()->json(['data' => $pipelines]);
     }
 
-    public function leadSources(): JsonResponse
+    public function leadSources(Request $request): JsonResponse
     {
+        abort_unless($request->user()->canDoAny([PermissionCode::PipelineView, PermissionCode::OpportunityCreate]), 403);
         $sources = LeadSource::where('is_active', true)
             ->orderBy('name')
             ->get()

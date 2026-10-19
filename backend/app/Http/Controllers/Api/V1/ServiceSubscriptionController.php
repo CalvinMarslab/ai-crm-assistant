@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Company\Models\Company;
 use App\Domain\Service\Models\ServiceSubscription;
 use App\Domain\Service\Services\ServiceRenewalService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Service\SaveServiceSubscriptionRequest;
+use App\Http\Resources\CompanySummaryResource;
 use App\Http\Resources\ServiceSubscriptionResource;
 use App\Jobs\SendRenewalEmail;
 use App\Support\OrganizationClock;
@@ -20,7 +22,7 @@ class ServiceSubscriptionController extends Controller
     {
         $this->authorize('viewAny', ServiceSubscription::class);
         $filters = $request->validate(['search' => ['nullable', 'string', 'max:255'], 'status' => ['nullable', 'in:active,paused,cancelled,expiring,overdue'], 'per_page' => ['nullable', 'integer', 'between:1,100']]);
-        $query = ServiceSubscription::query()->with(['company', 'owner']);
+        $query = ServiceSubscription::query()->visibleTo($request->user())->with(['company', 'owner']);
         if (! empty($filters['search'])) {
             $search = '%'.$filters['search'].'%';
             $query->where(fn ($q) => $q->where('name', 'like', $search)->orWhereHas('company', fn ($c) => $c->where('name', 'like', $search)));
@@ -37,10 +39,10 @@ class ServiceSubscriptionController extends Controller
         return ServiceSubscriptionResource::collection($query->orderBy('expires_on')->orderBy('id')->paginate($filters['per_page'] ?? 25));
     }
 
-    public function summary(OrganizationClock $clock): JsonResponse
+    public function summary(Request $request, OrganizationClock $clock): JsonResponse
     {
         $this->authorize('viewAny', ServiceSubscription::class);
-        $active = ServiceSubscription::where('status', 'active')->whereHas('company');
+        $active = ServiceSubscription::visibleTo($request->user())->where('status', 'active')->whereHas('company');
         $today = $clock->now()->toDateString();
         $until = $clock->now()->addDays(15)->toDateString();
 
@@ -58,6 +60,17 @@ class ServiceSubscriptionController extends Controller
     public function store(SaveServiceSubscriptionRequest $request, ServiceRenewalService $renewals): JsonResponse
     {
         return (new ServiceSubscriptionResource($renewals->save($request->validated())))->response()->setStatusCode(201);
+    }
+
+    public function companies(Request $request): AnonymousResourceCollection
+    {
+        $this->authorize('create', ServiceSubscription::class);
+        $filters = $request->validate(['search' => ['nullable', 'string', 'max:255']]);
+        $companies = Company::query()->select(['id', 'uuid', 'name'])
+            ->when(! empty($filters['search']), fn ($query) => $query->where('name', 'like', '%'.$filters['search'].'%'))
+            ->orderBy('name')->paginate(50);
+
+        return CompanySummaryResource::collection($companies);
     }
 
     public function show(ServiceSubscription $service): ServiceSubscriptionResource

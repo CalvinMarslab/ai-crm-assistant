@@ -7,6 +7,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Spin
 import { Modal, ModalFooter } from '@/components/Modal'
 import { dateTime, titleCase } from '@/lib/format'
 import { useAuth } from '@/hooks/useAuth'
+import type { User } from '@/types'
 
 type Tab = 'users' | 'pipeline' | 'telegram' | 'audit'
 
@@ -57,8 +58,9 @@ export default function SettingsPage() {
 }
 
 function UsersPanel() {
-  const { can } = useAuth()
+  const { can, user: currentUser } = useAuth()
   const [creating, setCreating] = useState(false)
+  const [editingRoles, setEditingRoles] = useState<User | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['users'],
@@ -86,6 +88,7 @@ function UsersPanel() {
             <th className="py-2">Roles</th>
             <th className="py-2">Status</th>
             <th className="py-2">Last login</th>
+            {can('user.manage') && <th className="py-2">Actions</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -108,14 +111,42 @@ function UsersPanel() {
               <td className="py-2.5 text-xs text-slate-400">
                 {user.last_login_at ? dateTime(user.last_login_at) : 'Never'}
               </td>
+              {can('user.manage') && <td className="py-2.5">
+                {user.id !== currentUser?.id && <Button size="sm" variant="secondary" onClick={() => setEditingRoles(user)}>Edit roles</Button>}
+              </td>}
             </tr>
           ))}
         </tbody>
       </table>
 
       <UserFormModal open={creating} onClose={() => setCreating(false)} />
+      {editingRoles && <UserRolesModal user={editingRoles} onClose={() => setEditingRoles(null)} />}
     </>
   )
+}
+
+function UserRolesModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const cache = useQueryClient()
+  const [selected, setSelected] = useState(user.roles?.map((role) => role.code) ?? [])
+  const roles = useQuery({ queryKey: ['roles'], queryFn: userApi.roles })
+  const save = useMutation({
+    mutationFn: () => userApi.update(user.id, { roles: selected }),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: ['users'] })
+      onClose()
+    },
+  })
+  return <Modal open title={`Roles — ${user.name}`} onClose={onClose}
+    footer={<ModalFooter onCancel={onClose} onConfirm={() => save.mutate()} pending={save.isPending} />}>
+    <p className="mb-4 text-sm text-slate-600">Select at least one role. Permissions from multiple roles are combined. For server and hosting access only, select only Server &amp; Hosting Manager.</p>
+    {roles.isLoading ? <Spinner /> : roles.error ? <ErrorState message={errorMessage(roles.error)} /> : (
+      <div className="space-y-3">{roles.data?.map((role) => <label key={role.code} className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={selected.includes(role.code)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, role.code] : previous.filter((code) => code !== role.code))} />
+        {role.name}
+      </label>)}</div>
+    )}
+    {save.error && <div className="mt-3"><ErrorState message={errorMessage(save.error)} /></div>}
+  </Modal>
 }
 
 function UserFormModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -176,6 +207,7 @@ function UserFormModal({ open, onClose }: { open: boolean; onClose: () => void }
             ))}
           </Select>
         </Field>
+        {form.role === 'server_hosting_manager' && <p className="sm:col-span-2 text-sm text-slate-600">Manage server and hosting records, expiry dates, pricing, payment records and renewal emails.</p>}
       </div>
     </Modal>
   )

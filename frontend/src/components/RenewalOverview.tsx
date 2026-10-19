@@ -10,9 +10,9 @@ export function RenewalOverview() {
   const query = useQuery({
     queryKey: ['renewal-summary'],
     queryFn: serviceApi.summary,
-    enabled: can('service.view'),
+    enabled: can('service.view') || can('service.view.server'),
   })
-  if (!can('service.view')) return null
+  if (!can('service.view') && !can('service.view.server')) return null
   if (query.error)
     return (
       <div className="mb-4">
