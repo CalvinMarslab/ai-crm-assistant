@@ -19,11 +19,19 @@ class SaveServiceSubscriptionRequest extends FormRequest
 
     public function rules(): array
     {
+        $types = [];
+        if ($this->user()->canDoAny([PermissionCode::ServiceManage, PermissionCode::ServiceManageServer])) {
+            $types[] = 'server';
+        }
+        if ($this->user()->canDoAny([PermissionCode::ServiceManage, PermissionCode::ServiceManageMaintenance])) {
+            $types[] = 'maintenance';
+        }
+
         return [
             'company_id' => ['required', 'uuid', Rule::exists('companies', 'uuid')->where('organization_id', OrganizationContext::id())->whereNull('deleted_at')],
             'cycle_id' => [$this->route('service') ? 'required' : 'prohibited', 'uuid'],
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', Rule::in($this->user()->canDo(PermissionCode::ServiceManage) ? ['maintenance', 'server'] : ['server'])],
+            'type' => ['required', Rule::in($types)],
             'customer_email' => ['nullable', 'email', 'max:255'],
             'internal_email' => ['required', 'email', 'max:255'],
             'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99', 'decimal:0,2'],

@@ -52,13 +52,14 @@ export default function App() {
     )
   }
 
-  if (can('service.view.server') && !can('service.view') && !can('pipeline.view') && !can('portal.access')) {
+  if ((can('service.view.server') || can('service.view.maintenance')) && !can('service.view') && !can('pipeline.view') && !can('portal.access')) {
     return (
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/services" element={<ServicesPage />} />
+          {can('service.view.server') && <Route path="/services" element={<ServicesPage key="server" serviceType="server" />} />}
+          {can('service.view.maintenance') && <Route path="/maintenance" element={<ServicesPage key="maintenance" serviceType="maintenance" />} />}
           <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="*" element={<Navigate to="/services" replace />} />
+          <Route path="*" element={<Navigate to={can('service.view.server') ? '/services' : '/maintenance'} replace />} />
         </Route>
       </Routes>
     )
@@ -82,7 +83,8 @@ export default function App() {
         <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/tasks" element={<TaskListPage />} />
-        <Route path="/services" element={<ServicesPage />} />
+        <Route path="/services" element={<ServicesPage key="server" serviceType="server" />} />
+        <Route path="/maintenance" element={<ServicesPage key="maintenance" serviceType="maintenance" />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

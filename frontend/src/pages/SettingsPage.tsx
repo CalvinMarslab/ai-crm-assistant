@@ -138,7 +138,7 @@ function UserRolesModal({ user, onClose }: { user: User; onClose: () => void }) 
   })
   return <Modal open title={`Roles — ${user.name}`} onClose={onClose}
     footer={<ModalFooter onCancel={onClose} onConfirm={() => save.mutate()} pending={save.isPending} />}>
-    <p className="mb-4 text-sm text-slate-600">Select at least one role. Permissions from multiple roles are combined. For server and hosting access only, select only Server &amp; Hosting Manager.</p>
+    <p className="mb-4 text-sm text-slate-600">Select at least one role. Permissions from multiple roles are combined. For access to one service area only, select only Server &amp; Hosting Manager or Maintenance Manager.</p>
     {roles.isLoading ? <Spinner /> : roles.error ? <ErrorState message={errorMessage(roles.error)} /> : (
       <div className="space-y-3">{roles.data?.map((role) => <label key={role.code} className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={selected.includes(role.code)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, role.code] : previous.filter((code) => code !== role.code))} />
@@ -208,6 +208,7 @@ function UserFormModal({ open, onClose }: { open: boolean; onClose: () => void }
           </Select>
         </Field>
         {form.role === 'server_hosting_manager' && <p className="sm:col-span-2 text-sm text-slate-600">Manage server and hosting records, expiry dates, pricing, payment records and renewal emails.</p>}
+        {form.role === 'maintenance_manager' && <p className="sm:col-span-2 text-sm text-slate-600">Manage maintenance records, expiry dates, pricing, payment records and renewal emails.</p>}
       </div>
     </Modal>
   )

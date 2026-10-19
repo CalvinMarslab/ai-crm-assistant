@@ -8,6 +8,7 @@ enum RoleCode: string
     case ReferralAgent = 'referral_agent';
     case ProjectManager = 'project_manager';
     case ServerHostingManager = 'server_hosting_manager';
+    case MaintenanceManager = 'maintenance_manager';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum RoleCode: string
             self::ReferralAgent => 'Referral Agent',
             self::ProjectManager => 'Project Manager',
             self::ServerHostingManager => 'Server & Hosting Manager',
+            self::MaintenanceManager => 'Maintenance Manager',
         };
     }
 
@@ -30,6 +32,11 @@ enum RoleCode: string
             self::ServerHostingManager => [
                 PermissionCode::ServiceViewServer,
                 PermissionCode::ServiceManageServer,
+            ],
+
+            self::MaintenanceManager => [
+                PermissionCode::ServiceViewMaintenance,
+                PermissionCode::ServiceManageMaintenance,
             ],
 
             // Agents see only what they introduced, and never internal material.
