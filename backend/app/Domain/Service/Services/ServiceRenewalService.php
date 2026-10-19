@@ -21,8 +21,8 @@ class ServiceRenewalService
 
     public function save(array $attributes, ?ServiceSubscription $service = null): ServiceSubscription
     {
-        if ($attributes['status'] === 'active' && (new ServiceSubscription($attributes))->missingRenewalDetails()) {
-            throw ValidationException::withMessages(['status' => 'Complete the customer email, amount, currency and renewal period before activating reminders.']);
+        if ($attributes['status'] === 'active' && ! (new ServiceSubscription($attributes))->hasRenewalTerms()) {
+            throw ValidationException::withMessages(['status' => 'Set the currency and renewal period before activating reminders.']);
         }
 
         return DB::transaction(function () use ($attributes, $service) {
@@ -54,8 +54,8 @@ class ServiceRenewalService
                     $task = Task::find($service->collection_task_id);
                     if ($task && ! $task->status->isClosed()) {
                         $this->tasks->update($task, [
-                            'title' => "Collect renewal: {$service->name}",
-                            'description' => "{$company->name} — {$service->currency} {$service->amount}; expires {$service->expires_on->toDateString()}.",
+                            'title' => ($service->amount === null ? 'Review renewal: ' : 'Collect renewal: ').$service->name,
+                            'description' => "{$company->name} — {$service->renewalAmountLabel()}; expires {$service->expires_on->toDateString()}.",
                         ]);
                     }
                 }
@@ -72,8 +72,8 @@ class ServiceRenewalService
         return DB::transaction(function () use ($service, $attributes) {
             $service = ServiceSubscription::whereKey($service->id)->lockForUpdate()->firstOrFail();
             $this->assertCurrentCycle($service, $attributes['cycle_id']);
-            if ($service->missingRenewalDetails()) {
-                throw ValidationException::withMessages(['status' => 'Complete the renewal details before recording payment.']);
+            if (! $service->canRecordPayment()) {
+                throw ValidationException::withMessages(['status' => 'Activate the service and set its price, currency and renewal period before recording payment.']);
             }
             if (number_format((float) $attributes['expected_amount'], 2, '.', '') !== $service->amount || $attributes['expected_currency'] !== $service->currency) {
                 throw ValidationException::withMessages(['expected_amount' => 'The renewal price has changed. Refresh and confirm the current amount before recording payment.']);

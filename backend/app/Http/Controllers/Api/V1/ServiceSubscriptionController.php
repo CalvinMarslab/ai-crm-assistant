@@ -48,7 +48,8 @@ class ServiceSubscriptionController extends Controller
             'active' => (clone $active)->count(),
             'expiring' => (clone $active)->whereDate('expires_on', '>=', $today)->whereDate('expires_on', '<=', $until)->count(),
             'overdue' => (clone $active)->whereDate('expires_on', '<', $today)->count(),
-            'pending' => (clone $active)->whereDate('expires_on', '<=', $until)->selectRaw('currency, SUM(amount) AS amount')->groupBy('currency')->get()->map(fn ($row) => ['currency' => $row->currency, 'amount' => (string) $row->amount]),
+            'pending' => (clone $active)->whereDate('expires_on', '<=', $until)->whereNotNull('amount')->selectRaw('currency, SUM(amount) AS amount')->groupBy('currency')->get()->map(fn ($row) => ['currency' => $row->currency, 'amount' => (string) $row->amount]),
+            'pending_price_count' => (clone $active)->whereDate('expires_on', '<=', $until)->whereNull('amount')->count(),
             'email_enabled' => (bool) config('renewals.email_enabled') && ! in_array(config('mail.default'), ['log', 'array'], true),
             'default_internal_email' => config('renewals.internal_email'),
         ]]);
@@ -93,6 +94,7 @@ class ServiceSubscriptionController extends Controller
             $service = ServiceSubscription::whereKey($service->id)->lockForUpdate()->firstOrFail();
             $record = $service->deliveries()->whereUuid($delivery)->lockForUpdate()->firstOrFail();
             abort_unless($service->status === 'active' && $record->cycle_id === $service->cycle_id && in_array($record->status, ['failed', 'uncertain'], true), 422, 'Only a failed or uncertain reminder for the current active cycle can be retried.');
+            abort_unless($service->hasRenewalTerms() && ($record->audience !== 'customer' || $service->canNotifyCustomer()), 422, 'Complete the details required for this reminder before retrying.');
             $record->update(['status' => 'queued', 'error' => null]);
             SendRenewalEmail::dispatch($record->id, $service->organization_id)->afterCommit();
         });

@@ -14,6 +14,8 @@ export interface ServiceSubscription {
   currency: string | null
   renewal_months: number | null
   missing_details: string[]
+  customer_reminder_ready: boolean
+  can_record_payment: boolean
   expires_on: string
   status: 'active' | 'paused' | 'cancelled'
   renewal_status: 'active' | 'expiring' | 'overdue' | 'paused' | 'cancelled'
@@ -44,6 +46,7 @@ export interface RenewalSummary {
   overdue: number
   active: number
   pending: { currency: string; amount: string }[]
+  pending_price_count: number
   email_enabled: boolean
   default_internal_email: string
 }

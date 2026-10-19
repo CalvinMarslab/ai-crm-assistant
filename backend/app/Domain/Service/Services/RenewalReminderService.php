@@ -20,24 +20,27 @@ class RenewalReminderService
         DB::transaction(function () use ($subscription) {
             $service = ServiceSubscription::whereKey($subscription->id)->lockForUpdate()->firstOrFail();
             $service->load(['company', 'owner']);
-            if ($service->status !== 'active' || $service->missingRenewalDetails() || ! $service->company || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->canDo(PermissionCode::ServiceManage) || $service->expires_on->toDateString() > $this->clock->now()->addDays(15)->toDateString()) {
+            if ($service->status !== 'active' || ! $service->hasRenewalTerms() || ! $service->company || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->canDo(PermissionCode::ServiceManage) || $service->expires_on->toDateString() > $this->clock->now()->addDays(15)->toDateString()) {
                 return;
             }
             if (! $service->collection_task_id) {
                 $task = $this->tasks->create([
                     'assigned_user_id' => $service->owner_user_id, 'created_by_user_id' => $service->owner_user_id,
                     'subject_type' => 'company', 'subject_id' => $service->company_id,
-                    'title' => "Collect renewal: {$service->name}",
-                    'description' => "{$service->company->name} — {$service->currency} {$service->amount}; expires {$service->expires_on->toDateString()}.",
+                    'title' => ($service->amount === null ? 'Review renewal: ' : 'Collect renewal: ').$service->name,
+                    'description' => "{$service->company->name} — {$service->renewalAmountLabel()}; expires {$service->expires_on->toDateString()}.",
                     'due_at' => $this->clock->now()->endOfDay()->utc(), 'is_internal' => true,
                 ]);
                 $service->update(['collection_task_id' => $task->id]);
-                $this->notifier->notify($service->owner, 'service.renewal_due', 'Service renewal payment due', $task->description, ['service_id' => $service->uuid, 'task_uuid' => $task->uuid]);
+                $this->notifier->notify($service->owner, 'service.renewal_due', $service->amount === null ? 'Service renewal price needed' : 'Service renewal payment due', $task->description, ['service_id' => $service->uuid, 'task_uuid' => $task->uuid]);
             }
             if (! config('renewals.email_enabled')) {
                 return;
             }
             foreach (['customer' => $service->customer_email, 'internal' => $service->internal_email] as $audience => $recipient) {
+                if (blank($recipient) || ($audience === 'customer' && ! $service->canNotifyCustomer())) {
+                    continue;
+                }
                 $delivery = RenewalDelivery::firstOrCreate([
                     'service_subscription_id' => $service->id, 'cycle_id' => $service->cycle_id, 'audience' => $audience, 'channel' => 'email',
                 ], ['recipient' => $recipient, 'status' => 'queued']);

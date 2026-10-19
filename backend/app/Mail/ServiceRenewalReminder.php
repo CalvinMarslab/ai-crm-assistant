@@ -13,7 +13,7 @@ class ServiceRenewalReminder extends Mailable
         public readonly string $companyName,
         public readonly string $serviceType,
         public readonly string $expiresOn,
-        public readonly string $amount,
+        public readonly ?string $amount,
         public readonly string $currency,
         public readonly bool $internal,
     ) {}

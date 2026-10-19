@@ -100,14 +100,15 @@ class ServiceRenewalTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_activation_requires_all_missing_details_with_422(): void
+    public function test_activation_requires_currency_and_renewal_period_with_422(): void
     {
         Queue::fake();
         $service = $this->service(['status' => 'paused', 'customer_email' => null, 'amount' => null, 'currency' => null, 'renewal_months' => null]);
         $payload = array_replace($this->payload($service->company), ['cycle_id' => $service->cycle_id, 'customer_email' => null, 'amount' => null, 'currency' => null, 'renewal_months' => null]);
 
         $this->actingAs($this->owner())->patchJson('/api/v1/services/'.$service->uuid, $payload)->assertUnprocessable()
-            ->assertJsonValidationErrors(['customer_email', 'amount', 'currency', 'renewal_months']);
+            ->assertJsonValidationErrors(['currency', 'renewal_months'])
+            ->assertJsonMissingValidationErrors(['customer_email', 'amount']);
 
         $this->assertDatabaseHas('service_subscriptions', ['id' => $service->id, 'status' => 'paused', 'amount' => null]);
         Queue::assertNothingPushed();
@@ -126,11 +127,11 @@ class ServiceRenewalTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_incomplete_active_service_cannot_create_reminders_or_record_payment(): void
+    public function test_missing_renewal_terms_block_reminders_and_payment(): void
     {
         Queue::fake();
         config(['renewals.email_enabled' => true]);
-        $service = $this->service(['amount' => null]);
+        $service = $this->service(['renewal_months' => null]);
 
         app(RenewalReminderService::class)->prepare($service);
         $this->actingAs($this->owner())->postJson('/api/v1/services/'.$service->uuid.'/renew', ['cycle_id' => $service->cycle_id, 'expected_amount' => '0.00', 'expected_currency' => 'MYR', 'paid_on' => '2026-06-15'])->assertUnprocessable()->assertJsonValidationErrors('status');
@@ -141,18 +142,129 @@ class ServiceRenewalTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_queued_mail_is_skipped_if_renewal_details_become_incomplete(): void
+    public static function customerReminderMissingFields(): array
+    {
+        return [['customer_email'], ['amount']];
+    }
+
+    #[DataProvider('customerReminderMissingFields')]
+    public function test_queued_customer_mail_is_skipped_if_required_details_are_removed(string $field): void
     {
         Mail::fake();
         config(['renewals.email_enabled' => true, 'mail.default' => 'smtp']);
         $service = $this->service();
         $delivery = $this->delivery($service);
-        $service->update(['customer_email' => null]);
+        $service->update([$field => null]);
 
         (new SendRenewalEmail($delivery->id, $this->organization->id))->handle(app(OrganizationClock::class));
 
         $this->assertDatabaseHas('renewal_deliveries', ['id' => $delivery->id, 'status' => 'skipped']);
         Mail::assertNothingSent();
+    }
+
+    public function test_active_service_accepts_missing_email_and_price_for_internal_reminders(): void
+    {
+        Queue::fake();
+        config(['renewals.email_enabled' => true]);
+        $company = Company::factory()->create(['organization_id' => $this->organization->id]);
+        $payload = array_replace($this->payload($company), ['customer_email' => null, 'amount' => null]);
+
+        $this->actingAs($this->owner())->postJson('/api/v1/services', $payload)->assertCreated()
+            ->assertJsonPath('data.status', 'active')->assertJsonPath('data.amount', null)
+            ->assertJsonPath('data.customer_reminder_ready', false)->assertJsonPath('data.can_record_payment', false);
+        $this->artisan('crm:renewal-reminders')->assertSuccessful();
+        $this->artisan('crm:renewal-reminders')->assertSuccessful();
+
+        $this->assertDatabaseCount('tasks', 1);
+        $this->assertDatabaseCount('renewal_deliveries', 1);
+        $this->assertDatabaseHas('renewal_deliveries', ['audience' => 'internal', 'recipient' => 'support@techweiser.my']);
+        $this->assertStringContainsString('Price pending', Task::firstOrFail()->description);
+        Queue::assertPushedOn('renewals', SendRenewalEmail::class);
+    }
+
+    public function test_missing_email_allows_internal_reminder_and_payment(): void
+    {
+        Queue::fake();
+        config(['renewals.email_enabled' => true]);
+        $service = $this->service(['customer_email' => null]);
+
+        app(RenewalReminderService::class)->prepare($service);
+        $this->assertDatabaseCount('renewal_deliveries', 1);
+        $this->assertDatabaseHas('renewal_deliveries', ['audience' => 'internal']);
+        $this->actingAs($this->owner())->getJson('/api/v1/services/'.$service->uuid)->assertOk()->assertJsonPath('data.can_record_payment', true);
+        $this->postJson('/api/v1/services/'.$service->uuid.'/renew', ['cycle_id' => $service->cycle_id, 'expected_amount' => '1200.00', 'expected_currency' => 'MYR', 'paid_on' => '2026-06-15'])
+            ->assertOk()->assertJsonPath('data.expires_on', '2027-06-30');
+        $this->assertDatabaseCount('service_payments', 1);
+    }
+
+    public function test_missing_price_with_customer_email_sends_internal_only_and_blocks_payment(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        config(['renewals.email_enabled' => true, 'mail.default' => 'smtp']);
+        $service = $this->service(['amount' => null]);
+
+        app(RenewalReminderService::class)->prepare($service);
+        $delivery = RenewalDelivery::firstOrFail();
+        $job = new SendRenewalEmail($delivery->id, $this->organization->id);
+        $job->handle(app(OrganizationClock::class));
+        $job->handle(app(OrganizationClock::class));
+
+        $this->assertDatabaseCount('renewal_deliveries', 1);
+        $this->assertSame('internal', $delivery->audience);
+        $this->assertSame('sent', $delivery->fresh()->status);
+        Mail::assertSent(ServiceRenewalReminder::class, fn ($mail) => $mail->internal && $mail->amount === null && $mail->hasTo($service->internal_email));
+        Mail::assertSentCount(1);
+        $this->actingAs($this->owner())->postJson('/api/v1/services/'.$service->uuid.'/renew', ['cycle_id' => $service->cycle_id, 'expected_amount' => '0.00', 'expected_currency' => 'MYR', 'paid_on' => '2026-06-15'])
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->assertDatabaseCount('service_payments', 0);
+    }
+
+    public function test_filling_missing_details_adds_customer_reminder_without_resending_internal_mail(): void
+    {
+        Queue::fake();
+        config(['renewals.email_enabled' => true]);
+        $service = $this->service(['customer_email' => null, 'amount' => null]);
+        app(RenewalReminderService::class)->prepare($service);
+        RenewalDelivery::firstOrFail()->update(['status' => 'sent', 'sent_at' => now()]);
+        Queue::fake();
+
+        $payload = $this->payload($service->company) + ['cycle_id' => $service->cycle_id];
+        $this->actingAs($this->owner())->patchJson('/api/v1/services/'.$service->uuid, $payload)->assertOk()->assertJsonPath('data.customer_reminder_ready', true);
+        app(RenewalReminderService::class)->prepare($service->fresh());
+
+        $this->assertDatabaseCount('tasks', 1);
+        $this->assertDatabaseCount('renewal_deliveries', 2);
+        $this->assertDatabaseHas('renewal_deliveries', ['audience' => 'internal', 'status' => 'sent']);
+        $customer = RenewalDelivery::where('audience', 'customer')->firstOrFail();
+        Queue::assertPushed(SendRenewalEmail::class, 1);
+        Queue::assertPushed(SendRenewalEmail::class, fn ($job) => $job->deliveryId === $customer->id);
+        $this->assertStringContainsString('1200.50', Task::firstOrFail()->description);
+    }
+
+    public function test_unknown_prices_are_counted_separately_from_collection_totals(): void
+    {
+        $this->service(['amount' => '100.00']);
+        $this->service(['amount' => null]);
+        $this->service(['amount' => null, 'currency' => 'USD']);
+        $this->service(['amount' => null, 'expires_on' => '2026-07-01']);
+        $this->service(['amount' => null, 'status' => 'paused']);
+
+        $response = $this->actingAs($this->owner())->getJson('/api/v1/services/summary')->assertOk()
+            ->assertJsonCount(1, 'data.pending')->assertJsonPath('data.pending.0.currency', 'MYR')->assertJsonPath('data.pending_price_count', 2);
+        $this->assertEquals(100, $response->json('data.pending.0.amount'));
+    }
+
+    public function test_unknown_price_mail_displays_pending_in_html_and_text_instead_of_zero(): void
+    {
+        $mail = new ServiceRenewalReminder('Server renewal', 'Example company', 'server', '2026-06-30', null, 'MYR', true);
+        $html = $mail->render();
+        $text = view('mail.services.renewal-text', $mail->buildViewData())->render();
+        foreach ([$html, $text] as $content) {
+            $this->assertStringContainsString('Price pending', $content);
+            $this->assertStringContainsString('before requesting payment', $content);
+            $this->assertStringNotContainsString('0.00', $content);
+        }
     }
 
     public function test_hides_other_tenant_records_with_404_and_rejects_company_with_422(): void
