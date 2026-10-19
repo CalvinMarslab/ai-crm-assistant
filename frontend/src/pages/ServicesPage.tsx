@@ -20,10 +20,16 @@ import {
   Textarea,
 } from '@/components/ui'
 
-const amount = (value: string, currency: string) =>
-  new Intl.NumberFormat('en-MY', { style: 'currency', currency }).format(
-    Number(value),
-  )
+const amount = (value: string | null, currency: string | null) =>
+  value === null
+    ? 'Price needed'
+    : !currency
+      ? `${Number(value).toFixed(2)} (currency needed)`
+      : new Intl.NumberFormat('en-MY', { style: 'currency', currency }).format(Number(value))
+
+const detailLabels: Record<string, string> = {
+  customer_email: 'customer email', amount: 'price', currency: 'currency', renewal_months: 'renewal period',
+}
 
 export default function ServicesPage() {
   const { can } = useAuth()
@@ -125,6 +131,7 @@ export default function ServicesPage() {
           <option value="cancelled">Cancelled</option>
         </Select>
       </div>
+      {list.data && <p className="mb-3 text-sm text-slate-500">{list.data.meta.total} service(s)</p>}
       {list.isLoading ? (
         <Spinner />
       ) : list.error ? (
@@ -177,7 +184,7 @@ export default function ServicesPage() {
                     <td className="px-4 py-4">
                       {amount(service.amount, service.currency)}
                       <p className="text-xs text-slate-500">
-                        Every {service.renewal_months} month(s)
+                        {service.renewal_months ? `Every ${service.renewal_months} month(s)` : 'Renewal period needed'}
                       </p>
                     </td>
                     <td className="px-4 py-4">
@@ -194,6 +201,7 @@ export default function ServicesPage() {
                       >
                         {service.renewal_status}
                       </Badge>
+                      {!!service.missing_details?.length && <p className="mt-1 text-xs text-amber-700">Needs details</p>}
                     </td>
                     <td className="px-4 py-4">
                       <Button
@@ -280,8 +288,8 @@ function ServiceForm({
     customer_email: service?.customer_email ?? '',
     internal_email: service?.internal_email ?? defaultEmail,
     amount: service?.amount ?? '',
-    currency: service?.currency ?? 'MYR',
-    renewal_months: String(service?.renewal_months ?? 12),
+    currency: service ? (service.currency ?? '') : 'MYR',
+    renewal_months: service ? (service.renewal_months === null ? '' : String(service.renewal_months)) : '12',
     expires_on: service?.expires_on ?? '',
     status: service?.status ?? 'active',
     notes: service?.notes ?? '',
@@ -290,8 +298,10 @@ function ServiceForm({
     mutationFn: () =>
       serviceApi.save(service?.id, {
         ...form,
-        amount: form.amount,
-        renewal_months: Number(form.renewal_months),
+        customer_email: form.customer_email || null,
+        amount: form.amount === '' ? null : form.amount,
+        currency: form.currency || null,
+        renewal_months: form.renewal_months === '' ? null : Number(form.renewal_months),
         ...(service ? { cycle_id: service.cycle_id } : {}),
       }),
     onSuccess: () => {
@@ -378,7 +388,8 @@ function ServiceForm({
             <option value="cancelled">Cancelled — stop reminders</option>
           </Select>
         </Field>
-        <Field label="Customer email" required error={errors.customer_email}>
+        {form.status !== 'active' && <p className="sm:col-span-2 text-sm text-amber-800">Reminders are stopped. Missing renewal details can be saved and completed before activating.</p>}
+        <Field label="Customer email" required={form.status === 'active'} error={errors.customer_email}>
           <Input type="email" {...field('customer_email')} />
         </Field>
         <Field
@@ -388,11 +399,12 @@ function ServiceForm({
         >
           <Input type="email" {...field('internal_email')} />
         </Field>
-        <Field label="Renewal amount" required error={errors.amount}>
+        <Field label="Renewal amount" required={form.status === 'active'} error={errors.amount}>
           <Input type="number" min="0" step="0.01" {...field('amount')} />
         </Field>
         <Field label="Currency" error={errors.currency}>
           <Select {...field('currency')}>
+            <option value="">Not confirmed</option>
             <option>MYR</option>
             <option>SGD</option>
             <option>USD</option>
@@ -415,7 +427,7 @@ function ServiceForm({
         </Field>
         <Field
           label="Renew every (months)"
-          required
+          required={form.status === 'active'}
           error={errors.renewal_months}
         >
           <Input type="number" min="1" max="120" {...field('renewal_months')} />
@@ -500,12 +512,13 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
               </Link>
               <p className="mt-2 text-sm">
                 {s.type} · Expires {s.expires_on} ·{' '}
-                {amount(s.amount, s.currency)} every {s.renewal_months} month(s)
+                {amount(s.amount, s.currency)} · {s.renewal_months ? `Every ${s.renewal_months} month(s)` : 'Renewal period needed'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Customer: {s.customer_email} · Internal: {s.internal_email}
+                Customer: {s.customer_email || 'Email needed'} · Internal: {s.internal_email}
               </p>
             </div>
+            {!!s.missing_details?.length && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Needs details: {s.missing_details.map((key) => detailLabels[key] ?? key).join(', ')}. Complete these in Edit before activating reminders or recording payment.</p>}
             {s.notes && (
               <p className="whitespace-pre-wrap text-sm text-slate-600">
                 {s.notes}
@@ -513,6 +526,7 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
             )}
             {can('service.manage') &&
               s.status === 'active' &&
+              !s.missing_details?.length &&
               (!paying ? (
                 <Button onClick={() => setPaying(true)}>
                   Record payment & renew

@@ -20,7 +20,7 @@ class RenewalReminderService
         DB::transaction(function () use ($subscription) {
             $service = ServiceSubscription::whereKey($subscription->id)->lockForUpdate()->firstOrFail();
             $service->load(['company', 'owner']);
-            if ($service->status !== 'active' || ! $service->company || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->canDo(PermissionCode::ServiceManage) || $service->expires_on->toDateString() > $this->clock->now()->addDays(15)->toDateString()) {
+            if ($service->status !== 'active' || $service->missingRenewalDetails() || ! $service->company || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->canDo(PermissionCode::ServiceManage) || $service->expires_on->toDateString() > $this->clock->now()->addDays(15)->toDateString()) {
                 return;
             }
             if (! $service->collection_task_id) {

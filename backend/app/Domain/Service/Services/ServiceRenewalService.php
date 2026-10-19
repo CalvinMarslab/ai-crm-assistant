@@ -21,6 +21,10 @@ class ServiceRenewalService
 
     public function save(array $attributes, ?ServiceSubscription $service = null): ServiceSubscription
     {
+        if ($attributes['status'] === 'active' && (new ServiceSubscription($attributes))->missingRenewalDetails()) {
+            throw ValidationException::withMessages(['status' => 'Complete the customer email, amount, currency and renewal period before activating reminders.']);
+        }
+
         return DB::transaction(function () use ($attributes, $service) {
             $company = Company::whereUuid($attributes['company_id'])->firstOrFail();
             $attributes['company_id'] = $company->id;
@@ -68,6 +72,9 @@ class ServiceRenewalService
         return DB::transaction(function () use ($service, $attributes) {
             $service = ServiceSubscription::whereKey($service->id)->lockForUpdate()->firstOrFail();
             $this->assertCurrentCycle($service, $attributes['cycle_id']);
+            if ($service->missingRenewalDetails()) {
+                throw ValidationException::withMessages(['status' => 'Complete the renewal details before recording payment.']);
+            }
             if (number_format((float) $attributes['expected_amount'], 2, '.', '') !== $service->amount || $attributes['expected_currency'] !== $service->currency) {
                 throw ValidationException::withMessages(['expected_amount' => 'The renewal price has changed. Refresh and confirm the current amount before recording payment.']);
             }

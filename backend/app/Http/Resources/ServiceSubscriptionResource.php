@@ -18,6 +18,7 @@ class ServiceSubscriptionResource extends JsonResource
             'amount' => $this->amount, 'currency' => $this->currency,
             'renewal_months' => $this->renewal_months, 'expires_on' => $this->expires_on->toDateString(),
             'status' => $this->status, 'renewal_status' => $this->renewalStatus(), 'notes' => $this->notes,
+            'missing_details' => $this->missingRenewalDetails(),
             'payments' => $this->whenLoaded('payments', fn () => $this->payments->map(fn ($payment) => [
                 'id' => $payment->uuid, 'amount' => $payment->amount, 'currency' => $payment->currency,
                 'paid_on' => $payment->paid_on->toDateString(), 'reference' => $payment->reference,

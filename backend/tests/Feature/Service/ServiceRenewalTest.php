@@ -82,6 +82,79 @@ class ServiceRenewalTest extends TestCase
         $this->assertDatabaseCount('service_subscriptions', 0);
     }
 
+    public function test_paused_service_preserves_unknown_details_without_scheduling_reminders(): void
+    {
+        Queue::fake();
+        config(['renewals.email_enabled' => true]);
+        $company = Company::factory()->create(['organization_id' => $this->organization->id]);
+        $payload = array_replace($this->payload($company), ['status' => 'paused', 'customer_email' => null, 'amount' => null, 'currency' => null, 'renewal_months' => null]);
+
+        $this->actingAs($this->owner())->postJson('/api/v1/services', $payload)->assertCreated()
+            ->assertJsonPath('data.amount', null)->assertJsonPath('data.customer_email', null)
+            ->assertJsonPath('data.missing_details', ['customer_email', 'amount', 'currency', 'renewal_months']);
+        $this->artisan('crm:renewal-reminders')->assertSuccessful();
+
+        $this->assertDatabaseHas('service_subscriptions', ['status' => 'paused', 'amount' => null, 'currency' => null, 'renewal_months' => null]);
+        $this->assertDatabaseCount('tasks', 0);
+        $this->assertDatabaseCount('renewal_deliveries', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_activation_requires_all_missing_details_with_422(): void
+    {
+        Queue::fake();
+        $service = $this->service(['status' => 'paused', 'customer_email' => null, 'amount' => null, 'currency' => null, 'renewal_months' => null]);
+        $payload = array_replace($this->payload($service->company), ['cycle_id' => $service->cycle_id, 'customer_email' => null, 'amount' => null, 'currency' => null, 'renewal_months' => null]);
+
+        $this->actingAs($this->owner())->patchJson('/api/v1/services/'.$service->uuid, $payload)->assertUnprocessable()
+            ->assertJsonValidationErrors(['customer_email', 'amount', 'currency', 'renewal_months']);
+
+        $this->assertDatabaseHas('service_subscriptions', ['id' => $service->id, 'status' => 'paused', 'amount' => null]);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_completed_paused_service_can_activate_with_explicit_zero_price(): void
+    {
+        Queue::fake();
+        $service = $this->service(['status' => 'paused', 'customer_email' => null, 'amount' => null]);
+        $payload = array_replace($this->payload($service->company), ['cycle_id' => $service->cycle_id, 'amount' => '0.00']);
+
+        $this->actingAs($this->owner())->patchJson('/api/v1/services/'.$service->uuid, $payload)->assertOk()
+            ->assertJsonPath('data.amount', '0.00')->assertJsonPath('data.status', 'active')->assertJsonPath('data.missing_details', []);
+
+        $this->assertDatabaseHas('service_subscriptions', ['id' => $service->id, 'status' => 'active', 'amount' => 0, 'customer_email' => 'client@example.test']);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_incomplete_active_service_cannot_create_reminders_or_record_payment(): void
+    {
+        Queue::fake();
+        config(['renewals.email_enabled' => true]);
+        $service = $this->service(['amount' => null]);
+
+        app(RenewalReminderService::class)->prepare($service);
+        $this->actingAs($this->owner())->postJson('/api/v1/services/'.$service->uuid.'/renew', ['cycle_id' => $service->cycle_id, 'expected_amount' => '0.00', 'expected_currency' => 'MYR', 'paid_on' => '2026-06-15'])->assertUnprocessable()->assertJsonValidationErrors('status');
+
+        $this->assertDatabaseCount('tasks', 0);
+        $this->assertDatabaseCount('renewal_deliveries', 0);
+        $this->assertDatabaseCount('service_payments', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_queued_mail_is_skipped_if_renewal_details_become_incomplete(): void
+    {
+        Mail::fake();
+        config(['renewals.email_enabled' => true, 'mail.default' => 'smtp']);
+        $service = $this->service();
+        $delivery = $this->delivery($service);
+        $service->update(['customer_email' => null]);
+
+        (new SendRenewalEmail($delivery->id, $this->organization->id))->handle(app(OrganizationClock::class));
+
+        $this->assertDatabaseHas('renewal_deliveries', ['id' => $delivery->id, 'status' => 'skipped']);
+        Mail::assertNothingSent();
+    }
+
     public function test_hides_other_tenant_records_with_404_and_rejects_company_with_422(): void
     {
         $other = Organization::factory()->create();
