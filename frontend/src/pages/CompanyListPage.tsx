@@ -12,11 +12,12 @@ import { useAuth } from '@/hooks/useAuth'
 export default function CompanyListPage() {
   const { can } = useAuth()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [creating, setCreating] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['companies', search],
-    queryFn: () => companyApi.list({ search, per_page: 50 }),
+    queryKey: ['companies', search, page],
+    queryFn: () => companyApi.list({ search, page, per_page: 50 }),
   })
 
   return (
@@ -28,7 +29,15 @@ export default function CompanyListPage() {
       />
 
       <div className="mb-4 max-w-sm">
-        <Input placeholder="Search companies…" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <Input
+          aria-label="Search companies"
+          placeholder="Search company, email or phone…"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value)
+            setPage(1)
+          }}
+        />
       </div>
 
       {isLoading ? (
@@ -37,34 +46,54 @@ export default function CompanyListPage() {
         <ErrorState message={errorMessage(error)} onRetry={() => void refetch()} />
       ) : !data?.data.length ? (
         <Card>
-          <EmptyState message="No companies yet." />
+          <EmptyState message={search ? 'No companies match your search.' : 'No companies yet.'} />
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {data.data.map((company) => (
-            <Link key={company.id} to={`/companies/${company.id}`}>
-              <Card className="h-full p-4 transition hover:shadow-md">
-                <h2 className="truncate text-sm font-semibold text-slate-900">{company.name}</h2>
-                <p className="mt-0.5 truncate text-xs text-slate-500">{company.industry ?? 'Industry not recorded'}</p>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-3xl text-sm" aria-label="Companies">
+              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium text-slate-500">
+                <tr>
+                  <th scope="col" className="px-4 py-2.5">Company</th>
+                  <th scope="col" className="px-4 py-2.5">Email</th>
+                  <th scope="col" className="px-4 py-2.5">Phone</th>
+                  <th scope="col" className="px-4 py-2.5 text-right">Contacts</th>
+                  <th scope="col" className="px-4 py-2.5 text-right">Opportunities</th>
+                  <th scope="col" className="px-4 py-2.5 text-right">Open value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.data.map((company) => (
+                  <tr key={company.id} className="transition hover:bg-slate-50">
+                    <td className="min-w-48 px-4 py-3">
+                      <Link to={`/companies/${company.id}`} className="font-semibold text-brand-700 hover:underline">
+                        {company.name}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-slate-500">{company.industry || 'Industry not recorded'}</p>
+                    </td>
+                    <td className="max-w-64 break-words px-4 py-3 text-slate-600">{company.email || '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{company.phone || '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{company.contacts_count ?? 0}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{company.opportunities_count ?? 0}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-slate-900">{money(company.open_opportunities_value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
-                <dl className="mt-3 flex gap-4 border-t border-slate-100 pt-3 text-xs">
-                  <div>
-                    <dt className="text-slate-400">Opportunities</dt>
-                    <dd className="mt-0.5 font-semibold text-slate-900">{company.opportunities_count ?? 0}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-400">Contacts</dt>
-                    <dd className="mt-0.5 font-semibold text-slate-900">{company.contacts_count ?? 0}</dd>
-                  </div>
-                  <div className="ml-auto text-right">
-                    <dt className="text-slate-400">Open value</dt>
-                    <dd className="mt-0.5 font-semibold text-slate-900">{money(company.open_opportunities_value)}</dd>
-                  </div>
-                </dl>
-              </Card>
-            </Link>
-          ))}
-        </div>
+      {data && data.meta.last_page > 1 && (
+        <nav aria-label="Company pages" className="mt-4 flex items-center justify-end gap-3 text-sm">
+          <Button variant="secondary" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>
+            Previous
+          </Button>
+          <span>Page {data.meta.current_page} of {data.meta.last_page}</span>
+          <Button variant="secondary" disabled={page >= data.meta.last_page} onClick={() => setPage((current) => current + 1)}>
+            Next
+          </Button>
+        </nav>
       )}
 
       <CompanyFormModal open={creating} onClose={() => setCreating(false)} />
