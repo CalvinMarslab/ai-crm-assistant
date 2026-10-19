@@ -14,6 +14,7 @@ class ServiceSubscriptionResource extends JsonResource
             'company' => new CompanySummaryResource($this->whenLoaded('company')),
             'owner' => new UserSummaryResource($this->whenLoaded('owner')),
             'name' => $this->name, 'type' => $this->type,
+            'customer_contact_name' => $this->customer_contact_name, 'customer_phone' => $this->customer_phone,
             'customer_email' => $this->customer_email, 'internal_email' => $this->internal_email,
             'amount' => $this->amount, 'currency' => $this->currency,
             'renewal_months' => $this->renewal_months, 'expires_on' => $this->expires_on->toDateString(),

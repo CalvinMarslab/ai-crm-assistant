@@ -182,6 +182,11 @@ export default function ServicesPage({ serviceType }: { serviceType: ServiceType
                         {service.company?.name ?? 'Company unavailable'} ·{' '}
                         {service.type}
                       </p>
+                      {(service.customer_contact_name || service.customer_phone) && (
+                        <p className="mt-1 text-xs text-slate-600">
+                          Contact: {[service.customer_contact_name, service.customer_phone].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-4">{service.expires_on}</td>
                     <td className="px-4 py-4">
@@ -290,6 +295,8 @@ function ServiceForm({
   const [form, setForm] = useState({
     name: service?.name ?? '',
     company_id: service?.company?.id ?? '',
+    customer_contact_name: service?.customer_contact_name ?? '',
+    customer_phone: service?.customer_phone ?? '',
     customer_email: service?.customer_email ?? '',
     internal_email: service?.internal_email ?? defaultEmail,
     amount: service?.amount ?? '',
@@ -304,6 +311,8 @@ function ServiceForm({
       serviceApi.save(service?.id, {
         ...form,
         type: serviceType,
+        customer_contact_name: form.customer_contact_name || null,
+        customer_phone: form.customer_phone || null,
         customer_email: form.customer_email || null,
         amount: form.amount === '' ? null : form.amount,
         currency: form.currency || null,
@@ -392,6 +401,12 @@ function ServiceForm({
           </Select>
         </Field>
         {form.status !== 'active' && <p className="sm:col-span-2 text-sm text-amber-800">Reminders are stopped while this service is paused or cancelled.</p>}
+        <Field label="Customer contact name" error={errors.customer_contact_name} hint="Optional. Person to contact for this service.">
+          <Input maxLength={255} {...field('customer_contact_name')} />
+        </Field>
+        <Field label="Customer phone / WhatsApp" error={errors.customer_phone} hint="Optional. Include country code, e.g. +60 12-345 6789.">
+          <Input type="tel" maxLength={50} {...field('customer_phone')} />
+        </Field>
         <Field label="Customer email" error={errors.customer_email} hint="Optional. Leave blank to remind only the internal collection email.">
           <Input type="email" {...field('customer_email')} />
         </Field>
@@ -517,8 +532,18 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 {s.type} · Expires {s.expires_on} ·{' '}
                 {amount(s.amount, s.currency)} · {s.renewal_months ? `Every ${s.renewal_months} month(s)` : 'Renewal period needed'}
               </p>
+              <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs text-slate-500">Customer contact name</dt>
+                  <dd className="mt-1">{s.customer_contact_name || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Customer phone / WhatsApp</dt>
+                  <dd className="mt-1">{s.customer_phone || '—'}</dd>
+                </div>
+              </dl>
               <p className="mt-1 text-xs text-slate-500">
-                Customer: {s.customer_email || 'No email — internal reminders only'} · Internal: {s.internal_email}
+                Customer email: {s.customer_email || 'No email — internal reminders only'} · Internal: {s.internal_email}
               </p>
             </div>
             {s.status === 'active' && !s.customer_reminder_ready && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Reminders go only to {s.internal_email}. Add both a customer email and a price to enable customer reminders.{s.amount === null && ' Price is pending; add it before recording payment.'}</p>}

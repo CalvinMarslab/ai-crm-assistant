@@ -32,6 +32,8 @@ class SaveServiceSubscriptionRequest extends FormRequest
             'cycle_id' => [$this->route('service') ? 'required' : 'prohibited', 'uuid'],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in($types)],
+            'customer_contact_name' => ['nullable', 'string', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:50'],
             'customer_email' => ['nullable', 'email', 'max:255'],
             'internal_email' => ['required', 'email', 'max:255'],
             'amount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99', 'decimal:0,2'],
