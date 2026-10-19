@@ -8,6 +8,9 @@ namespace App\Domain\Activity\Enums;
  */
 enum ActivityType: string
 {
+    case ServiceCreated = 'service.created';
+    case ServiceUpdated = 'service.updated';
+    case ServiceRenewed = 'service.renewed';
     case OpportunityCreated = 'opportunity.created';
     case OpportunityUpdated = 'opportunity.updated';
     case StageChanged = 'opportunity.stage_changed';

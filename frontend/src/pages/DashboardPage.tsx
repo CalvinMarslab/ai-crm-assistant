@@ -9,6 +9,7 @@ import { Timeline } from '@/components/Timeline'
 import { money } from '@/lib/format'
 import { useAuth } from '@/hooks/useAuth'
 import type { Task } from '@/types'
+import { RenewalOverview } from '@/components/RenewalOverview'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -48,6 +49,7 @@ export default function DashboardPage() {
       />
 
       {/* Actions first, metrics second — the dashboard prioritises execution. */}
+      <RenewalOverview />
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <SectionCard title="Overdue tasks" count={sections.overdue_tasks.length} tone="danger">
           {sections.overdue_tasks.length === 0 ? (

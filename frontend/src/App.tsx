@@ -20,6 +20,7 @@ import ProjectDetailPage from '@/pages/ProjectDetailPage'
 import PortalPage from '@/pages/PortalPage'
 import AssistantPage from '@/pages/AssistantPage'
 import BriefPage from '@/pages/BriefPage'
+import ServicesPage from '@/pages/ServicesPage'
 
 export default function App() {
   const { user, loading, can } = useAuth()
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/projects" element={<ProjectListPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/tasks" element={<TaskListPage />} />
+        <Route path="/services" element={<ServicesPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
