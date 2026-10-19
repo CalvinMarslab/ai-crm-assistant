@@ -52,6 +52,26 @@ class ServiceSubscription extends Model
         return array_values(array_filter(['customer_email', 'amount', 'currency', 'renewal_months'], fn (string $field): bool => $this->{$field} === null || $this->{$field} === ''));
     }
 
+    public function hasRenewalTerms(): bool
+    {
+        return filled($this->currency) && $this->renewal_months > 0;
+    }
+
+    public function canRecordPayment(): bool
+    {
+        return $this->status === 'active' && $this->hasRenewalTerms() && $this->amount !== null;
+    }
+
+    public function canNotifyCustomer(): bool
+    {
+        return $this->canRecordPayment() && filled($this->customer_email);
+    }
+
+    public function renewalAmountLabel(): string
+    {
+        return $this->amount === null ? 'Price pending' : "{$this->currency} {$this->amount}";
+    }
+
     public function renewalStatus(): string
     {
         if ($this->status !== 'active') {

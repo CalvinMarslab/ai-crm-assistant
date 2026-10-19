@@ -22,7 +22,7 @@ import {
 
 const amount = (value: string | null, currency: string | null) =>
   value === null
-    ? 'Price needed'
+    ? 'Price pending'
     : !currency
       ? `${Number(value).toFixed(2)} (currency needed)`
       : new Intl.NumberFormat('en-MY', { style: 'currency', currency }).format(Number(value))
@@ -94,6 +94,7 @@ export default function ServicesPage() {
                   .map((p) => amount(p.amount, p.currency))
                   .join(' · ')
               : 'None'}
+            {summary.data.pending_price_count > 0 && ` · ${summary.data.pending_price_count} more awaiting price`}
           </p>
           {!summary.data.email_enabled && (
             <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
@@ -201,7 +202,7 @@ export default function ServicesPage() {
                       >
                         {service.renewal_status}
                       </Badge>
-                      {!!service.missing_details?.length && <p className="mt-1 text-xs text-amber-700">Needs details</p>}
+                      {service.status === 'active' && !service.customer_reminder_ready && <p className="mt-1 text-xs text-amber-700">Internal reminders only</p>}
                     </td>
                     <td className="px-4 py-4">
                       <Button
@@ -388,8 +389,8 @@ function ServiceForm({
             <option value="cancelled">Cancelled — stop reminders</option>
           </Select>
         </Field>
-        {form.status !== 'active' && <p className="sm:col-span-2 text-sm text-amber-800">Reminders are stopped. Missing renewal details can be saved and completed before activating.</p>}
-        <Field label="Customer email" required={form.status === 'active'} error={errors.customer_email}>
+        {form.status !== 'active' && <p className="sm:col-span-2 text-sm text-amber-800">Reminders are stopped while this service is paused or cancelled.</p>}
+        <Field label="Customer email" error={errors.customer_email} hint="Optional. Leave blank to remind only the internal collection email.">
           <Input type="email" {...field('customer_email')} />
         </Field>
         <Field
@@ -399,10 +400,10 @@ function ServiceForm({
         >
           <Input type="email" {...field('internal_email')} />
         </Field>
-        <Field label="Renewal amount" required={form.status === 'active'} error={errors.amount}>
+        <Field label="Renewal amount" error={errors.amount} hint="Leave blank if unknown. Internal reminders continue; customer emails and payment recording wait for a price.">
           <Input type="number" min="0" step="0.01" {...field('amount')} />
         </Field>
-        <Field label="Currency" error={errors.currency}>
+        <Field label="Currency" required={form.status === 'active'} error={errors.currency}>
           <Select {...field('currency')}>
             <option value="">Not confirmed</option>
             <option>MYR</option>
@@ -515,18 +516,18 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 {amount(s.amount, s.currency)} · {s.renewal_months ? `Every ${s.renewal_months} month(s)` : 'Renewal period needed'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Customer: {s.customer_email || 'Email needed'} · Internal: {s.internal_email}
+                Customer: {s.customer_email || 'No email — internal reminders only'} · Internal: {s.internal_email}
               </p>
             </div>
-            {!!s.missing_details?.length && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Needs details: {s.missing_details.map((key) => detailLabels[key] ?? key).join(', ')}. Complete these in Edit before activating reminders or recording payment.</p>}
+            {s.status === 'active' && !s.customer_reminder_ready && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Reminders go only to {s.internal_email}. Add both a customer email and a price to enable customer reminders.{s.amount === null && ' Price is pending; add it before recording payment.'}</p>}
+            {s.status !== 'active' && !!s.missing_details?.length && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Missing: {s.missing_details.map((key) => detailLabels[key] ?? key).join(', ')}. Currency and renewal period are required to activate internal reminders.</p>}
             {s.notes && (
               <p className="whitespace-pre-wrap text-sm text-slate-600">
                 {s.notes}
               </p>
             )}
             {can('service.manage') &&
-              s.status === 'active' &&
-              !s.missing_details?.length &&
+              s.can_record_payment &&
               (!paying ? (
                 <Button onClick={() => setPaying(true)}>
                   Record payment & renew
@@ -624,6 +625,7 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
                     </div>
                     {can('service.manage') &&
                       s.status === 'active' &&
+                      (d.audience !== 'customer' || s.customer_reminder_ready) &&
                       d.cycle_id === s.cycle_id &&
                       ['failed', 'uncertain'].includes(d.status) && (
                         <Button
