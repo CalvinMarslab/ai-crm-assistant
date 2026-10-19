@@ -115,7 +115,7 @@ class ServiceRenewalTest extends TestCase
         $this->assertDatabaseCount('tasks', 1);
         $this->assertDatabaseHas('tasks', ['assigned_user_id' => $service->owner_user_id, 'is_internal' => true]);
         $this->assertDatabaseHas('app_notifications', ['type' => 'service.renewal_due']);
-        Queue::assertPushed(SendRenewalEmail::class);
+        Queue::assertPushedOn('renewals', SendRenewalEmail::class);
     }
 
     public function test_skips_future_and_inactive_services_and_dry_run_has_no_writes(): void

@@ -27,7 +27,10 @@ class SendRenewalEmail implements ShouldBeUnique, ShouldQueue
 
     public array $backoff = [60, 300, 900];
 
-    public function __construct(public readonly int $deliveryId, public readonly int $organizationId) {}
+    public function __construct(public readonly int $deliveryId, public readonly int $organizationId)
+    {
+        $this->onQueue('renewals');
+    }
 
     public function uniqueId(): string
     {
