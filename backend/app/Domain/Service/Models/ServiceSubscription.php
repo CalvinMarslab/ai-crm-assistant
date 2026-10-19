@@ -60,9 +60,15 @@ class ServiceSubscription extends Model
             return $query;
         }
 
-        return $user->canDo(PermissionCode::ServiceViewServer)
-            ? $query->where('type', 'server')
-            : $query->whereRaw('1 = 0');
+        $types = [];
+        if ($user->canDo(PermissionCode::ServiceViewServer)) {
+            $types[] = 'server';
+        }
+        if ($user->canDo(PermissionCode::ServiceViewMaintenance)) {
+            $types[] = 'maintenance';
+        }
+
+        return $query->whereIn('type', $types);
     }
 
     public function hasRenewalTerms(): bool

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { serviceApi, type ServiceSubscription } from '@/api/services'
+import { serviceApi, type ServiceSubscription, type ServiceType } from '@/api/services'
 import { errorMessage, validationErrors } from '@/api/client'
 import { useAuth } from '@/hooks/useAuth'
 import { PageHeader } from '@/components/PageHeader'
@@ -30,10 +30,11 @@ const detailLabels: Record<string, string> = {
   customer_email: 'customer email', amount: 'price', currency: 'currency', renewal_months: 'renewal period',
 }
 
-export default function ServicesPage() {
+export default function ServicesPage({ serviceType }: { serviceType: ServiceType }) {
   const { can } = useAuth()
-  const canView = can('service.view') || can('service.view.server')
-  const canManage = can('service.manage') || can('service.manage.server')
+  const canView = can('service.view') || can(`service.view.${serviceType}`)
+  const canManage = can('service.manage') || can(`service.manage.${serviceType}`)
+  const isMaintenance = serviceType === 'maintenance'
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -42,13 +43,13 @@ export default function ServicesPage() {
   )
   const [detailId, setDetailId] = useState<string | null>(null)
   const list = useQuery({
-    queryKey: ['services', search, status, page],
-    queryFn: () => serviceApi.list({ search, status, page }),
+    queryKey: ['services', serviceType, search, status, page],
+    queryFn: () => serviceApi.list({ type: serviceType, search, status, page }),
     enabled: canView,
   })
   const summary = useQuery({
-    queryKey: ['renewal-summary'],
-    queryFn: serviceApi.summary,
+    queryKey: ['renewal-summary', serviceType],
+    queryFn: () => serviceApi.summary(serviceType),
     enabled: canView,
   })
 
@@ -58,11 +59,11 @@ export default function ServicesPage() {
   return (
     <>
       <PageHeader
-        title={can('service.view') ? 'Services & renewals' : 'Server & hosting'}
+        title={isMaintenance ? 'Maintenance' : 'Server & hosting'}
         subtitle="Renewals and payment tracking · Email reminders 15 days before expiry"
         action={
           canManage && (
-            <Button onClick={() => setEditing('new')}>+ New service</Button>
+            <Button onClick={() => setEditing('new')}>{isMaintenance ? '+ New maintenance' : '+ New server / hosting'}</Button>
           )
         }
       />
@@ -79,7 +80,7 @@ export default function ServicesPage() {
               [
                 ['Expiring in 15 days', summary.data.expiring],
                 ['Overdue', summary.data.overdue],
-                ['Active services', summary.data.active],
+                [isMaintenance ? 'Active maintenance' : 'Active server / hosting', summary.data.active],
               ] as const
             ).map(([label, count]) => (
               <Card key={label} className="p-4">
@@ -108,7 +109,7 @@ export default function ServicesPage() {
       <div className="mb-4 flex flex-wrap gap-3">
         <Input
           className="max-w-sm"
-          placeholder="Search service or company…"
+          placeholder={isMaintenance ? 'Search maintenance or company…' : 'Search server, hosting or company…'}
           aria-label="Search services"
           value={search}
           onChange={(e) => {
@@ -125,7 +126,7 @@ export default function ServicesPage() {
             setPage(1)
           }}
         >
-          <option value="">All services</option>
+          <option value="">{isMaintenance ? 'All maintenance' : 'All server / hosting'}</option>
           <option value="expiring">Expiring in 15 days</option>
           <option value="overdue">Overdue</option>
           <option value="active">Active</option>
@@ -133,7 +134,7 @@ export default function ServicesPage() {
           <option value="cancelled">Cancelled</option>
         </Select>
       </div>
-      {list.data && <p className="mb-3 text-sm text-slate-500">{list.data.meta.total} service(s)</p>}
+      {list.data && <p className="mb-3 text-sm text-slate-500">{list.data.meta.total} {isMaintenance ? 'maintenance record(s)' : 'server / hosting record(s)'}</p>}
       {list.isLoading ? (
         <Spinner />
       ) : list.error ? (
@@ -143,7 +144,7 @@ export default function ServicesPage() {
         />
       ) : !list.data?.data.length ? (
         <Card>
-          <EmptyState message="No services match. Add a maintenance or server service to start tracking renewals." />
+          <EmptyState message={isMaintenance ? 'No maintenance records match. Add maintenance to start tracking renewals.' : 'No server or hosting records match. Add a service to start tracking renewals.'} />
         </Card>
       ) : (
         <Card>
@@ -213,7 +214,7 @@ export default function ServicesPage() {
                       >
                         View / collect
                       </Button>
-                      {(can('service.manage') || (service.type === 'server' && can('service.manage.server'))) && (
+                      {canManage && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -255,6 +256,7 @@ export default function ServicesPage() {
         <ServiceForm
           key={editing === 'new' ? 'new' : editing.id}
           service={editing === 'new' ? undefined : editing}
+          serviceType={serviceType}
           defaultEmail={
             summary.data?.default_internal_email ?? 'support@techweiser.my'
           }
@@ -270,14 +272,15 @@ export default function ServicesPage() {
 
 function ServiceForm({
   service,
+  serviceType,
   defaultEmail,
   onClose,
 }: {
   service?: ServiceSubscription
+  serviceType: ServiceType
   defaultEmail: string
   onClose: () => void
 }) {
-  const { can } = useAuth()
   const cache = useQueryClient()
   const [companySearch, setCompanySearch] = useState('')
   const companies = useQuery({
@@ -287,7 +290,6 @@ function ServiceForm({
   const [form, setForm] = useState({
     name: service?.name ?? '',
     company_id: service?.company?.id ?? '',
-    type: service?.type ?? (can('service.manage') ? 'maintenance' : 'server'),
     customer_email: service?.customer_email ?? '',
     internal_email: service?.internal_email ?? defaultEmail,
     amount: service?.amount ?? '',
@@ -301,6 +303,7 @@ function ServiceForm({
     mutationFn: () =>
       serviceApi.save(service?.id, {
         ...form,
+        type: serviceType,
         customer_email: form.customer_email || null,
         amount: form.amount === '' ? null : form.amount,
         currency: form.currency || null,
@@ -322,7 +325,7 @@ function ServiceForm({
   return (
     <Modal
       open
-      title={service ? 'Edit service' : 'New service'}
+      title={`${service ? 'Edit' : 'New'} ${serviceType === 'maintenance' ? 'maintenance' : 'server / hosting'}`}
       onClose={onClose}
       footer={
         <ModalFooter
@@ -342,7 +345,7 @@ function ServiceForm({
           <Field label="Service name" required error={errors.name}>
             <Input
               {...field('name')}
-              placeholder="e.g. Website server hosting"
+              placeholder={serviceType === 'maintenance' ? 'e.g. Annual website maintenance' : 'e.g. Website server hosting'}
             />
           </Field>
         </div>
@@ -379,10 +382,7 @@ function ServiceForm({
           )}
         </div>
         <Field label="Service type" error={errors.type}>
-          <Select {...field('type')}>
-            {can('service.manage') && <option value="maintenance">Maintenance</option>}
-            <option value="server">Server / Hosting</option>
-          </Select>
+          <Input value={serviceType === 'maintenance' ? 'Maintenance' : 'Server / Hosting'} readOnly />
         </Field>
         <Field label="Status" error={errors.status}>
           <Select {...field('status')}>
@@ -528,7 +528,7 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 {s.notes}
               </p>
             )}
-            {(can('service.manage') || (s.type === 'server' && can('service.manage.server'))) &&
+            {(can('service.manage') || can(`service.manage.${s.type}`)) &&
               s.can_record_payment &&
               (!paying ? (
                 <Button onClick={() => setPaying(true)}>
@@ -625,7 +625,7 @@ function ServiceDetail({ id, onClose }: { id: string; onClose: () => void }) {
                         {d.error ? ` · ${d.error}` : ''}
                       </p>
                     </div>
-                    {(can('service.manage') || (s.type === 'server' && can('service.manage.server'))) &&
+                    {(can('service.manage') || can(`service.manage.${s.type}`)) &&
                       s.status === 'active' &&
                       (d.audience !== 'customer' || s.customer_reminder_ready) &&
                       d.cycle_id === s.cycle_id &&

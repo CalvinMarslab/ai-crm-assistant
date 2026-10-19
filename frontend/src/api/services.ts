@@ -1,11 +1,13 @@
 import { api } from './client'
 import type { Paginated, UserSummary } from '@/types'
 
+export type ServiceType = 'maintenance' | 'server'
+
 export interface ServiceSubscription {
   id: string
   cycle_id: string
   name: string
-  type: 'maintenance' | 'server'
+  type: ServiceType
   company: { id: string; name: string } | null
   owner: UserSummary | null
   customer_email: string | null
@@ -58,9 +60,9 @@ export const serviceApi = {
     api
       .get<Paginated<ServiceSubscription>>('/services', { params })
       .then((r) => r.data),
-  summary: () =>
+  summary: (type: ServiceType) =>
     api
-      .get<{ data: RenewalSummary }>('/services/summary')
+      .get<{ data: RenewalSummary }>('/services/summary', { params: { type } })
       .then((r) => r.data.data),
   get: (id: string) =>
     api

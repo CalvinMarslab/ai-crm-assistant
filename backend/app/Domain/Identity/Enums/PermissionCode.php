@@ -13,6 +13,8 @@ enum PermissionCode: string
     case ServiceManage = 'service.manage';
     case ServiceViewServer = 'service.view.server';
     case ServiceManageServer = 'service.manage.server';
+    case ServiceViewMaintenance = 'service.view.maintenance';
+    case ServiceManageMaintenance = 'service.manage.maintenance';
     // Companies & contacts
     case CompanyViewAll = 'company.view.all';
     case CompanyManage = 'company.manage';

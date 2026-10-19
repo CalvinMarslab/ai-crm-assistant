@@ -20,6 +20,11 @@ interface NavItem {
  */
 const portalNavigation: NavItem[] = [{ to: '/', label: 'My referrals', icon: '◫' }]
 
+const serviceNavigation: NavItem[] = [
+  { to: '/services', label: 'Server & hosting', icon: '↻', permission: 'service.view.server' },
+  { to: '/maintenance', label: 'Maintenance', icon: '⚒', permission: 'service.view.maintenance' },
+]
+
 const navigation: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: '◫' },
   { to: '/brief', label: 'Daily brief', icon: '☀', permission: 'ai.use' },
@@ -28,7 +33,7 @@ const navigation: NavItem[] = [
   { to: '/opportunities', label: 'Opportunities', icon: '◈' },
   { to: '/projects', label: 'Projects', icon: '▣', permission: 'project.view.assigned' },
   { to: '/tasks', label: 'Tasks', icon: '✓', permission: 'task.view.own' },
-  { to: '/services', label: 'Services & renewals', icon: '↻', permission: 'service.view' },
+  ...serviceNavigation,
   { to: '/companies', label: 'Companies', icon: '⌂', permission: 'company.view.all' },
   { to: '/contacts', label: 'Contacts', icon: '☺', permission: 'contact.view.all' },
   { to: '/agents', label: 'Agents', icon: '⇄' },
@@ -47,15 +52,14 @@ export function AppLayout() {
   })
 
   const isPortalOnly = can('portal.access') && !can('opportunity.view.all')
-  const isHostingOnly = can('service.view.server') && !can('service.view') && !can('pipeline.view') && !can('portal.access')
-  const hostingNavigation: NavItem[] = [{ to: '/services', label: 'Server & hosting', icon: '↻' }]
+  const isServiceOnly = (can('service.view.server') || can('service.view.maintenance')) && !can('service.view') && !can('pipeline.view') && !can('portal.access')
 
-  const visible = (isPortalOnly ? portalNavigation : isHostingOnly ? hostingNavigation : navigation).filter((item) => {
+  const visible = (isPortalOnly ? portalNavigation : isServiceOnly ? serviceNavigation : navigation).filter((item) => {
     if (!item.permission) return true
     // Task visibility is granted by either of two codes.
     if (item.permission === 'task.view.own') return can('task.view.own') || can('task.view.all')
     if (item.permission === 'project.view.assigned') return can('project.view.assigned') || can('project.view.all')
-    if (item.permission === 'service.view') return can('service.view') || can('service.view.server')
+    if (item.permission.startsWith('service.view.')) return can('service.view') || can(item.permission)
     return can(item.permission)
   })
 

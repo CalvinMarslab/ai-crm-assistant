@@ -21,8 +21,11 @@ class ServiceSubscriptionController extends Controller
     public function index(Request $request, OrganizationClock $clock): AnonymousResourceCollection
     {
         $this->authorize('viewAny', ServiceSubscription::class);
-        $filters = $request->validate(['search' => ['nullable', 'string', 'max:255'], 'status' => ['nullable', 'in:active,paused,cancelled,expiring,overdue'], 'per_page' => ['nullable', 'integer', 'between:1,100']]);
+        $filters = $request->validate(['type' => ['sometimes', 'required', 'in:server,maintenance'], 'search' => ['nullable', 'string', 'max:255'], 'status' => ['nullable', 'in:active,paused,cancelled,expiring,overdue'], 'per_page' => ['nullable', 'integer', 'between:1,100']]);
         $query = ServiceSubscription::query()->visibleTo($request->user())->with(['company', 'owner']);
+        if (isset($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
         if (! empty($filters['search'])) {
             $search = '%'.$filters['search'].'%';
             $query->where(fn ($q) => $q->where('name', 'like', $search)->orWhereHas('company', fn ($c) => $c->where('name', 'like', $search)));
@@ -42,7 +45,11 @@ class ServiceSubscriptionController extends Controller
     public function summary(Request $request, OrganizationClock $clock): JsonResponse
     {
         $this->authorize('viewAny', ServiceSubscription::class);
+        $filters = $request->validate(['type' => ['sometimes', 'required', 'in:server,maintenance']]);
         $active = ServiceSubscription::visibleTo($request->user())->where('status', 'active')->whereHas('company');
+        if (isset($filters['type'])) {
+            $active->where('type', $filters['type']);
+        }
         $today = $clock->now()->toDateString();
         $until = $clock->now()->addDays(15)->toDateString();
 
