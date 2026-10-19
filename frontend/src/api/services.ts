@@ -8,11 +8,12 @@ export interface ServiceSubscription {
   type: 'maintenance' | 'server'
   company: { id: string; name: string } | null
   owner: UserSummary | null
-  customer_email: string
+  customer_email: string | null
   internal_email: string
-  amount: string
-  currency: string
-  renewal_months: number
+  amount: string | null
+  currency: string | null
+  renewal_months: number | null
+  missing_details: string[]
   expires_on: string
   status: 'active' | 'paused' | 'cancelled'
   renewal_status: 'active' | 'expiring' | 'overdue' | 'paused' | 'cancelled'

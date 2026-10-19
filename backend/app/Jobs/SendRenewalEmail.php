@@ -49,7 +49,7 @@ class SendRenewalEmail implements ShouldBeUnique, ShouldQueue
                     return null;
                 }
                 $service = $delivery->subscription()->with(['company', 'owner', 'organization'])->first();
-                if (! $service || $service->status !== 'active' || $service->cycle_id !== $delivery->cycle_id || ! $service->company || $service->organization->status !== 'active' || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->canDo(PermissionCode::ServiceManage) || $service->expires_on->toDateString() > $clock->now()->addDays(15)->toDateString()) {
+                if (! $service || $service->status !== 'active' || $service->missingRenewalDetails() || $service->cycle_id !== $delivery->cycle_id || ! $service->company || $service->organization->status !== 'active' || ! $service->owner || $service->owner->status !== 'active' || ! $service->owner->canDo(PermissionCode::ServiceManage) || $service->expires_on->toDateString() > $clock->now()->addDays(15)->toDateString()) {
                     $delivery->update(['status' => 'skipped', 'error' => 'Service is no longer eligible for this reminder.']);
 
                     return null;

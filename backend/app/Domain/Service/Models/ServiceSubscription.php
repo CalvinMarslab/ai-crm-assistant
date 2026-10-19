@@ -47,6 +47,11 @@ class ServiceSubscription extends Model
         return $this->hasMany(RenewalDelivery::class)->orderByDesc('id');
     }
 
+    public function missingRenewalDetails(): array
+    {
+        return array_values(array_filter(['customer_email', 'amount', 'currency', 'renewal_months'], fn (string $field): bool => $this->{$field} === null || $this->{$field} === ''));
+    }
+
     public function renewalStatus(): string
     {
         if ($this->status !== 'active') {
