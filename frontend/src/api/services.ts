@@ -10,6 +10,8 @@ export interface ServiceSubscription {
   type: ServiceType
   company: { id: string; name: string } | null
   owner: UserSummary | null
+  customer_contact_name: string | null
+  customer_phone: string | null
   customer_email: string | null
   internal_email: string
   amount: string | null

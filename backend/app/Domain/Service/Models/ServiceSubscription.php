@@ -22,7 +22,7 @@ class ServiceSubscription extends Model
     use HasFactory;
     use HasUuid;
 
-    protected $fillable = ['company_id', 'owner_user_id', 'name', 'type', 'customer_email', 'internal_email', 'amount', 'currency', 'renewal_months', 'expires_on', 'status', 'notes', 'cycle_id', 'collection_task_id'];
+    protected $fillable = ['company_id', 'owner_user_id', 'name', 'type', 'customer_contact_name', 'customer_phone', 'customer_email', 'internal_email', 'amount', 'currency', 'renewal_months', 'expires_on', 'status', 'notes', 'cycle_id', 'collection_task_id'];
 
     protected function casts(): array
     {
