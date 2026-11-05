@@ -23,7 +23,7 @@ export default function OfficePage() {
   }, [])
 
   return <div className="crm-office-page">
-    <PageHeader title="AI Office" subtitle="Techweiser · Gaga · 共享健身房。点击人物展开操作台，再安排工作。"
+    <PageHeader title="AI Office" subtitle="Techweiser · Gaga · 后场 HYROX 训练场。点击人物展开操作台，再安排工作。"
       action={<Button variant="secondary" size="sm" onClick={() => setAgentIndex(0)}>安排工作 ↗</Button>} />
     <div className="crm-office-scene">
       {!loaded && <p className="crm-office-loading" role="status">正在进入办公室…</p>}
