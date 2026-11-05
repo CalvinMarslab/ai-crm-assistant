@@ -1,0 +1,18 @@
+/* Keep the original scene and controls, with a compact CRM page surround. */
+html, body.crm-office { margin: 0; min-width: 0; background: #f4f7f7; }
+.crm-office .site-header, .crm-office .intro, .crm-office .story-section,
+.crm-office .closing, .crm-office footer, .crm-office .demo-disclosure,
+.crm-office .inspector-task, .crm-office #present { display: none !important; }
+.crm-office main { max-width: none; width: 100%; padding: 0; margin: 0; }
+.crm-office .studio { margin: 0; border: 0; border-radius: 0; }
+.crm-office .studio-toolbar { padding: 12px 18px; }
+.crm-office .office-wrap { padding: 12px; }
+.crm-office #office-3d { height: max(420px, calc(100vh - 165px)); }
+.crm-office .gaga-team, .crm-office .agent-inspector { margin: 14px 0; }
+.crm-office .campus-zones { padding: 10px; }
+.crm-office .scene-caption { margin: 8px 0; }
+@media(max-width: 600px) {
+  .crm-office .office-wrap { padding: 6px; }
+  .crm-office .studio-title .floor-number, .crm-office #mode-text { display: none; }
+  .crm-office #office-3d { height: max(400px, calc(100vh - 180px)); }
+}

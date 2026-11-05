@@ -9,3 +9,6 @@ Thumbs.db
 
 # Local tooling
 .claude/
+
+# Generated from frontend/office-source during dev/build.
+frontend/public/office-scene/

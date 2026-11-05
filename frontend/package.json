@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "node scripts/build-office.mjs && vite",
+    "build": "node scripts/build-office.mjs && tsc -b && vite build",
+    "test:office": "node --experimental-strip-types --test scripts/office.test.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -23,8 +24,10 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "esbuild": "0.28.2",
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
+    "three": "0.186.1",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }
