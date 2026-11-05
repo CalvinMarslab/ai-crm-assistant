@@ -272,8 +272,8 @@ export function createOfficeLink(){
   box(root,0xc9d1d7,[12,-.19,5.5],[2.9,.36,1.70],.08);
   box(root,0xf1dbab,[12,.014,5.5],[2.9,.028,1.65]);
   for(let x=10.65;x<13.4;x+=.25)box(root,0xd1b987,[x,.031,5.5],[.012,.003,1.62]);
-  // The south edge is open where the new gym walkway branches off.
-  for(const z of[4.70]){
+  // The north edge opens onto the passage between the offices to HYROX.
+  for(const z of[6.30]){
     rod(root,0xbccbd1,[10.7,.60,z],[13.3,.60,z],.022);
     for(const x of[10.7,12,13.3])rod(root,0xbccbd1,[x,.03,z],[x,.60,z],.018);
   }

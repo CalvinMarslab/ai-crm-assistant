@@ -47,7 +47,7 @@ export class GymMotion extends CharacterMotion{
     const trip=this.trip;
     if(!trip){this.elevation=smooth(this.elevation,0,12,dt);return}
     const station=trip.station;
-    this.elevation=station.kind==='run'?.18*Math.max(0,Math.min(1,(1.1-distance(this.position,station))/.55)):0;
+    this.elevation=0;
     if(trip.suspended)return;
     if(trip.stage==='gathering'&&this.state==='idle'&&!this.path.length)this.startOutbound();
     else if(trip.stage==='outbound'&&this.state==='idle'&&!this.path.length){
