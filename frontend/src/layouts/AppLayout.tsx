@@ -29,6 +29,7 @@ const navigation: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: '◫' },
   { to: '/brief', label: 'Daily brief', icon: '☀', permission: 'ai.use' },
   { to: '/assistant', label: 'Assistant', icon: '✦', permission: 'ai.use' },
+  { to: '/office', label: 'AI Office', icon: '⌂', permission: 'ai.use' },
   { to: '/pipeline', label: 'Pipeline', icon: '▤' },
   { to: '/opportunities', label: 'Opportunities', icon: '◈' },
   { to: '/projects', label: 'Projects', icon: '▣', permission: 'project.view.assigned' },

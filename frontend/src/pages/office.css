@@ -1,0 +1,33 @@
+.crm-office-scene { position: relative; overflow: hidden; border: 1px solid #d9e4ea; border-radius: 18px; background: #edf5f5; }
+.crm-office-scene iframe { display: block; width: 100%; height: calc(100dvh - 180px); min-height: 640px; border: 0; }
+.crm-office-loading { position: absolute; top: 24px; left: 24px; color: #426270; }
+.crm-office-dialog { width: min(760px, calc(100vw - 24px)); height: min(900px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); padding: 0; margin: auto; border: 1px solid #d8e2e9; border-radius: 20px; color: #102538; background: white; box-shadow: 0 24px 100px #10253840; }
+.crm-office-dialog[open] { display: flex; flex-direction: column; }
+.crm-office-dialog::backdrop { background: #10253870; backdrop-filter: blur(3px); }
+.crm-office-chat-heading { position: relative; flex-shrink: 0; padding: 20px 24px 12px; border-bottom: 1px solid #e4ecf0; }
+.crm-office-chat-heading h2 { margin: 5px 36px 12px 0; font-size: 24px; font-weight: 700; }
+.crm-office-close { position: absolute; right: 18px; top: 16px; width: 36px; height: 36px; border-radius: 50%; background: #f0f5f8; font-size: 24px; cursor: pointer; }
+.crm-office-role { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 12px; }
+.crm-office-role select { padding: 8px 12px; border: 1px solid #c9d7e0; border-radius: 8px; font-size: 14px; }
+.crm-office-chat-service { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 12px; padding: 10px 24px; background: #f6fafb; font-size: 12px; }
+.crm-office-chat-service button { color: #2863a7; cursor: pointer; }
+.crm-office-chat-service button:last-child { margin-left: auto; }
+.crm-office-chat-log { flex: 1; min-height: 80px; overflow: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.crm-office-chat-empty { padding: 32px 0; text-align: center; color: #577184; }
+.crm-office-chat-empty h3 { margin-bottom: 8px; color: #183345; font-weight: 700; font-size: 20px; }
+.crm-office-message { max-width: 94%; padding: 12px 16px; background: #f0f5f8; border-radius: 14px; align-self: flex-start; overflow-wrap: anywhere; }
+.crm-office-message.user { align-self: flex-end; background: #e9f2ff; }
+.crm-office-message strong { font-size: 12px; color: #4b6579; }
+.crm-office-message p { white-space: pre-wrap; font-size: 14px; line-height: 1.7; margin-top: 5px; }
+.crm-office-chat-form { flex-shrink: 0; padding: 14px 24px 18px; border-top: 1px solid #e4ecf0; }
+.crm-office-chat-form label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.crm-office-chat-form textarea { width: 100%; height: 90px; resize: vertical; max-height: 180px; padding: 10px 12px; border: 1px solid #b9cbd6; border-radius: 10px; font-size: 14px; line-height: 1.6; }
+.crm-office-chat-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+.crm-office-chat-actions span { font-size: 11px; color: #6b7e8c; }
+@media(max-width: 600px) {
+  .crm-office-scene iframe { min-height: 580px; }
+  .crm-office-chat-heading, .crm-office-chat-log { padding: 14px; }
+  .crm-office-chat-service { padding: 8px 14px; }
+  .crm-office-chat-form { padding: 12px 14px; }
+  .crm-office-chat-actions span { max-width: 150px; }
+}

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { AppLayout } from '@/layouts/AppLayout'
@@ -21,6 +22,7 @@ import PortalPage from '@/pages/PortalPage'
 import AssistantPage from '@/pages/AssistantPage'
 import BriefPage from '@/pages/BriefPage'
 import ServicesPage from '@/pages/ServicesPage'
+const OfficePage = lazy(() => import('@/pages/OfficePage'))
 
 export default function App() {
   const { user, loading, can } = useAuth()
@@ -72,6 +74,7 @@ export default function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/brief" element={<BriefPage />} />
         <Route path="/assistant" element={<AssistantPage />} />
+        {can('ai.use') && <Route path="/office" element={<Suspense fallback={<Spinner />}><OfficePage /></Suspense>} />}
         <Route path="/pipeline" element={<OpportunityBoardPage />} />
         <Route path="/opportunities" element={<OpportunityListPage />} />
         <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
